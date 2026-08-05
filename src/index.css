@@ -1,0 +1,44 @@
+@import 'tailwindcss';
+
+@theme {
+  --color-fb-orange: #ff7a00;
+  --color-fb-teal: #009379;
+  --color-fb-teal-dark: #007a64;
+  --color-fb-accent: #fe895c;
+  --color-fb-accent-dark: #f5703d;
+  --color-fb-tint: #f0faf8;
+  --color-fb-tint-border: #d9ede8;
+  --font-sans:
+    system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
+    sans-serif;
+}
+
+/* Dropdown panel entrance. */
+@keyframes dd-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/*
+ * iframe-resizer friendly: the document must size itself to its content.
+ * Never use 100vh / min-height / fixed heights on html, body, or #root.
+ */
+html,
+body,
+#root {
+  height: auto;
+  min-height: 0;
+}
+
+body {
+  margin: 0;
+  background: transparent;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
