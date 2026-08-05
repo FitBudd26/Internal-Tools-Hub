@@ -1,28 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { PlatformHashtags } from '../types';
-
-async function copyText(text: string): Promise<boolean> {
-  try {
-    await navigator.clipboard.writeText(text);
-    return true;
-  } catch {
-    // Fallback for older browsers / iframes without clipboard permission.
-    try {
-      const ta = document.createElement('textarea');
-      ta.value = text;
-      ta.setAttribute('readonly', '');
-      ta.style.position = 'fixed';
-      ta.style.opacity = '0';
-      document.body.appendChild(ta);
-      ta.select();
-      const ok = document.execCommand('copy');
-      ta.remove();
-      return ok;
-    } catch {
-      return false;
-    }
-  }
-}
+import { copyText } from '../lib/copy';
 
 function CopyIcon() {
   return (
@@ -77,13 +55,13 @@ function TagChip({ tag }: { tag: string }) {
   );
 }
 
-/** One platform's hashtag set with a copy-all action. */
-export function HashtagBlock({ group }: { group: PlatformHashtags }) {
+/** One platform's hashtag set: name, tags, short tip, and a Copy action. */
+export function PlatformHashtagBlock({ group }: { group: PlatformHashtags }) {
   const [copied, setCopied] = useState(false);
   const timer = useRef<number | undefined>(undefined);
   useEffect(() => () => window.clearTimeout(timer.current), []);
 
-  const handleCopyAll = async () => {
+  const handleCopy = async () => {
     const all = group.tags.map((t) => `#${t}`).join(' ');
     if (!(await copyText(all))) return;
     setCopied(true);
@@ -102,20 +80,14 @@ export function HashtagBlock({ group }: { group: PlatformHashtags }) {
         </span>
         <button
           type="button"
-          onClick={handleCopyAll}
-          aria-label={
-            copied ? 'Copied' : `Copy all ${group.platform} hashtags`
-          }
-          className={`inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-fb-teal ${
-            copied
-              ? 'text-fb-teal'
-              : 'text-fb-teal hover:bg-fb-teal/10'
-          }`}
+          onClick={handleCopy}
+          aria-label={copied ? 'Copied' : `Copy ${group.platform} hashtags`}
+          className="inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold text-fb-teal transition-colors hover:bg-fb-teal/10 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-fb-teal"
         >
           {copied ? '✓ Copied' : (
             <>
               <CopyIcon />
-              Copy all
+              Copy
             </>
           )}
         </button>
@@ -125,6 +97,9 @@ export function HashtagBlock({ group }: { group: PlatformHashtags }) {
           <TagChip key={tag} tag={tag} />
         ))}
       </div>
+      <p className="mt-1.5 text-[11px] leading-snug text-gray-500">
+        Tip: {group.tip}
+      </p>
       <span aria-live="polite" className="sr-only">
         {copied ? `${group.platform} hashtags copied to clipboard` : ''}
       </span>

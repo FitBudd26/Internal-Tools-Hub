@@ -53,4 +53,5 @@ export interface HashtagFormState {
 export interface PlatformHashtags {
   platform: Platform;
   tags: string[];
+  tip: string;
 }

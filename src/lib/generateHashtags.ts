@@ -104,6 +104,7 @@ interface PlatformSpec {
   /** How many staples get guaranteed slots. */
   reserve: number;
   banned: Set<string>;
+  tip: string;
 }
 
 const VIRAL_TAGS = new Set(['fyp', 'foryou', 'foryoupage', 'viral', 'viralvideo', 'trendingnow']);
@@ -115,48 +116,56 @@ const PLATFORM_SPECS: Record<Platform, PlatformSpec> = {
     staples: ['instadaily', 'explorepage'],
     reserve: 1,
     banned: new Set(),
+    tip: 'Use a mix of broad and niche tags for better discovery.',
   },
   TikTok: {
     count: 6,
     staples: ['fyp', 'foryoupage', 'tiktok'],
     reserve: 2,
     banned: new Set(),
+    tip: 'Mix niche and trend tags — keep them short and relevant.',
   },
   'Twitter/X': {
     count: 3,
     staples: [],
     reserve: 0,
     banned: VIRAL_TAGS,
+    tip: 'Keep it minimal and context-driven — long tag blocks hurt reach.',
   },
   LinkedIn: {
     count: 5,
     staples: ['careergrowth', 'professionaldevelopment'],
     reserve: 1,
     banned: new Set([...VIRAL_TAGS, ...CASUAL_TAGS]),
+    tip: 'Stick to clean, professional, industry-specific tags.',
   },
   YouTube: {
-    count: 4,
+    count: 6,
     staples: ['youtube', 'subscribe'],
     reserve: 1,
     banned: new Set(),
+    tip: 'Use searchable topic tags that match your video content.',
   },
   Facebook: {
-    count: 3,
+    count: 4,
     staples: [],
     reserve: 0,
     banned: VIRAL_TAGS,
+    tip: 'A few clean category tags beat long hashtag blocks.',
   },
   Pinterest: {
-    count: 8,
+    count: 10,
     staples: ['inspiration', 'ideas'],
     reserve: 1,
     banned: VIRAL_TAGS,
+    tip: 'Use evergreen, searchable tags people actually browse.',
   },
   Threads: {
-    count: 2,
+    count: 3,
     staples: ['threads'],
     reserve: 1,
     banned: VIRAL_TAGS,
+    tip: 'Keep it conversational — one or two tags is plenty.',
   },
 };
 
@@ -311,17 +320,27 @@ export function generateHashtags(
     'keepshowingup',
   ];
 
+  // How many platform sets each tag has already appeared in — used to keep
+  // one strong tag from repeating across every selected platform.
+  const globalUse = new Map<string, number>();
+
   return input.platforms.map((platform) => {
     const spec = PLATFORM_SPECS[platform];
     const rng = mulberry32(seed ^ hashString(platform));
 
     const pool: string[] = [];
+    const deferred: string[] = [];
     const used = new Set<string>(caption.existing); // don't repeat the caption's own tags
     const add = (raw: string) => {
       if (pool.length >= spec.count * 2) return;
       const tag = cleanTag(raw);
       if (!tag || used.has(tag) || spec.banned.has(tag)) return;
       used.add(tag);
+      // Overused across platforms → only comes back if this pool runs short.
+      if ((globalUse.get(tag) ?? 0) >= 3) {
+        deferred.push(tag);
+        return;
+      }
       pool.push(tag);
     };
 
@@ -361,6 +380,12 @@ export function generateHashtags(
       for (const t of shuffled) add(t);
     }
 
+    // Refill from over-used tags only when the pool would otherwise be short.
+    for (const tag of deferred) {
+      if (pool.length >= spec.count) break;
+      pool.push(tag);
+    }
+
     let tags: string[];
     if (variant === 0) {
       tags = pool.slice(0, spec.count);
@@ -374,6 +399,8 @@ export function generateHashtags(
       tags = shuffled.slice(0, spec.count);
     }
 
-    return { platform, tags };
+    for (const t of tags) globalUse.set(t, (globalUse.get(t) ?? 0) + 1);
+
+    return { platform, tags, tip: spec.tip };
   });
 }
