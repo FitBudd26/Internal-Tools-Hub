@@ -1,71 +1,139 @@
-# Hashtag Generator
+# FitBudd Internal Tools Hub
 
-Compact, embeddable hashtag tool for FitBudd. Paste a caption, pick target
-platforms, and get platform-tailored hashtag sets — shown in a pop-up modal
-with per-platform tips, copy buttons, a global Copy All, and a FitBudd CTA.
-Hashtags come from Google Gemini when a key is configured, with a
-deterministic built-in engine as the always-on fallback. Max width 536px,
-designed for Webflow blog pages, landing pages, or iframes.
-Sibling project to the Gym Name Generator and shares its design system.
+One repo, one Vercel project, many embeddable lead-magnet tools. Every tool is
+its own page (`/<tool>/`), its own Webflow iframe embed and its own HubSpot
+lead source, while sharing the FitBudd design system, the tracking route and
+the build. The root page (`/`) is an internal, noindexed index that lists each
+tool with its embed snippet.
 
-**Stack:** React 19 · TypeScript · Tailwind CSS v4 · Vite, plus two Vercel
-serverless routes: `api/generate.ts` (Gemini hashtag generation, optional)
-and `api/track.ts` (HubSpot lead capture). Generating requires a name and
-a valid email; those two values are the only data recorded in HubSpot.
+| Tool | Path | What it does | HubSpot data |
+| --- | --- | --- | --- |
+| Hashtag Generator | `/hashtag-generator/` | Platform-tailored hashtag sets from a caption (Gemini, with a deterministic fallback), shown in a modal with copy buttons and a CTA | name + email |
+| Fitness Challenge Generator for Coaches & Gyms | `/fitness-challenge-generator/` | Three-step flow → email gate → ready-to-run client challenge framework with a branded PDF download and a 30-day-trial CTA | email + selections (see below) |
+
+**Stack:** React 19 · TypeScript · Tailwind CSS v4 · Vite (multi-page) ·
+jsPDF (client-side PDF) · two Vercel serverless routes: `api/track.ts`
+(HubSpot lead capture, shared by all tools) and `api/generate.ts` (Gemini
+hashtag generation).
 
 ## Commands
 
 ```bash
 npm install
-npm run dev       # local dev server; /api/* is served too (copy .env.example → .env for Gemini). Tracking is skipped in dev.
+npm run dev       # http://localhost:5173/ — index, /hashtag-generator/, /fitness-challenge-generator/
+                  # /api/* is served too (copy .env.example → .env). Tracking is skipped in dev
+                  # unless VITE_TRACK_IN_DEV=true — every event is a real HubSpot submission.
 npm run build     # type-check (src + api) + production build → dist/
 npm run preview   # serve the production build locally
 ```
 
-## Embedding
+## Deploying (Vercel)
 
-Same pattern as the other FitBudd tools (iframe-resizer **v4** on both
-sides — the matching child script is already in `index.html`; the results
-modal sizes itself to the iframe, so no parent changes needed):
+Import the repo as one Vercel project, framework Vite, root directory `/`.
+`api/` becomes the two serverless routes automatically; `vercel.json` raises
+`api/generate.ts` to a 30 s max duration. Env vars: `GEMINI_API_KEY` (AI
+hashtags; optional), plus the optional HubSpot overrides below. Free (Hobby)
+limits are more than enough — 2 of 12 functions, small static pages — but
+Hobby is for non-commercial use, so plan on Pro once the tools are live on
+fitbudd.com.
+
+After deploying, open `/api/track` (every tool's HubSpot form status) and
+`/api/generate` (`configured: true` once the Gemini key is set).
+
+## Embedding on Webflow
+
+Open `/` on the deployment and copy the snippet for the tool. It is the same
+pattern as the other FitBudd tools (iframe-resizer **v4** on both sides —
+the child script is in each tool's `index.html`, so the page sizes itself and
+no fixed height is needed):
 
 ```html
 <div style="max-width:536px;margin:0 auto;">
   <iframe
-    id="fitbudd-hashtag"
-    src="https://YOUR-VERCEL-URL/"
+    id="fitbudd-hashtag-generator"
+    src="https://YOUR-DEPLOYMENT/hashtag-generator/"
     title="Hashtag Generator"
     scrolling="no"
-    style="width:1px;min-width:100%;max-width:536px;height:580px;border:0;display:block;margin:0 auto;"
+    style="width:1px;min-width:100%;max-width:536px;height:720px;border:0;display:block;margin:0 auto;"
     loading="lazy"
     allow="clipboard-write"
   ></iframe>
 </div>
-
 <script src="https://cdn.jsdelivr.net/npm/iframe-resizer@4.3.9/js/iframeResizer.min.js"></script>
 <script>
-  iFrameResize({ checkOrigin: false, log: false }, '#fitbudd-hashtag');
+  iFrameResize({ checkOrigin: false, log: false }, '#fitbudd-hashtag-generator');
 </script>
 ```
 
-## AI generation (Gemini)
+One tool per Webflow page keeps each lead magnet separately attributable.
 
-When `GEMINI_API_KEY` is set, Generate Hashtags calls `/api/generate`
-(`api/generate.ts`), a Vercel serverless route that asks Google Gemini for
-caption-specific, per-platform hashtags. A free Google AI Studio key
-(https://aistudio.google.com/apikey) is enough. Regenerate sends the tags
-already shown so the next set is different.
+## HubSpot lead capture (`api/track.ts`)
 
-- the key never leaves the server; the browser only talks to `/api/generate`
-- the model must answer in a fixed JSON schema; `src/lib/aiHashtags.ts` then
-  re-applies the built-in engine's rules to every tag (lowercase letters and
-  digits only, spam tags dropped, no #fyp-style tags on LinkedIn / X /
-  Facebook / Pinterest / Threads, the caption's own tags skipped, the spec's
-  count ranges, a tag on at most 3 platforms) and tops up any short platform
-  from the built-in engine
-- anything that goes wrong — no key, quota exhausted, timeout (15 s), bad
-  JSON — silently falls back to the built-in engine, so results always appear
-- `GET /api/generate` answers `{ configured, model }` for a quick check after
-  deploying; upstream errors are written to the Vercel function logs
+Every tool posts `{ tool, type, fields }` to `/api/track`, which forwards the
+allowed fields to HubSpot's Forms Submission API. Defaults: FitBudd's portal
+`9058640` and form `e7410680-1ea2-4f36-8f94-bde4cd94aa62` (region na1) for
+every tool — both IDs are public (they appear in the form's embed snippet).
+Nothing HubSpot-related ships in the bundle.
+
+```
+HUBSPOT_PORTAL_ID                             optional — override the portal
+HUBSPOT_FORM_ID                               optional — default form for all tools
+HUBSPOT_FORM_ID_HASHTAG_GENERATOR             optional — per-tool form
+HUBSPOT_FORM_ID_FITNESS_CHALLENGE_GENERATOR   optional — per-tool form
+HUBSPOT_PRIVATE_APP_TOKEN                     optional — authenticated secure-submit endpoint
+VITE_TRACK_IN_DEV                             dev only — 'true' sends events from `npm run dev`
+```
+
+What each tool sends:
+
+- **Hashtag Generator** — `generation`: `email`, `firstname`. Nothing else
+  (caption, hashtags, CTA clicks) is recorded, by decision.
+- **Fitness Challenge Generator** — `lead` (from the email gate): `email`,
+  `challenge_types`, `audience_types`, `fitness_levels`, `challenge_duration`,
+  `equipment_availability`, `measurement_preferences`, `send_more_tools`,
+  `generated_challenge_name`, `tool_source`, `campaign`, `cta_destination`,
+  `page_url`, `submitted_at`. Then `pdf_download` (`pdf_downloaded`,
+  `pdf_downloaded_at`, `challenge_name`) and `cta_click` (`cta_clicked`,
+  `cta_text`, `cta_url`, `cta_clicked_at`), each with the email.
+
+HubSpot rejects a whole submission if it names a field the form does not
+define, so the route reads the form's public definition, sends only the
+fields that exist, and logs the rest once per deployment. Secondary events
+(PDF download, CTA click) are skipped when nothing but the email would
+survive, so a form without those fields never receives duplicate leads. Every
+submission carries the tool name as HubSpot's `pageName` context, so tools
+sharing one form remain distinguishable in the submissions list.
+
+With the form as it is today (fields: `email`, `firstname`), the Hashtag
+Generator records name + email and the Challenge Generator records the email.
+To capture the challenge selections, give that tool its own form (clone the
+current one, add the fields above as single-line text contact properties, set
+`HUBSPOT_FORM_ID_FITNESS_CHALLENGE_GENERATOR`). `GET /api/track` shows, per
+tool, `formFields`, `missingFields` and `requiredButNeverSent`. Leads appear
+as contacts and under Marketing → Forms → the form → Submissions. HubSpot
+rejections are logged in the Vercel function logs.
+
+## Hashtag Generator
+
+Validation: caption, at least one platform, name and a valid email — compact
+inline errors, no browser alerts, button disabled until valid. Results open
+in a centered modal with per-platform tips, per-tag and per-platform copy,
+Copy All, Regenerate and the FitBudd CTA
+(`https://dashboard.fitbudd.com/signup?utm_source=hashtag_generator&utm_medium=tool_cta&utm_campaign=lead_conversion`).
+
+### AI generation (Gemini)
+
+When `GEMINI_API_KEY` is set, Generate calls `/api/generate`
+(`api/generate.ts`), which asks Google Gemini for caption-specific,
+per-platform hashtags in a fixed JSON schema. A free Google AI Studio key
+(https://aistudio.google.com/apikey) is enough. `aiHashtags.ts` re-applies
+the built-in engine's rules to every tag (lowercase letters and digits only,
+spam tags dropped, no #fyp-style tags on LinkedIn / X / Facebook / Pinterest
+/ Threads, the caption's own tags skipped, the spec's count ranges, a tag on
+at most 3 platforms) and tops up any short platform from the built-in engine.
+Anything that goes wrong — no key, quota exhausted, 15 s timeout, bad JSON —
+silently falls back to the built-in engine. Regenerate sends the tags already
+shown so the next set is different.
 
 ```
 GEMINI_API_KEY   required for AI generation; without it the built-in engine is used
@@ -73,88 +141,78 @@ GEMINI_MODEL     optional, defaults to gemini-3.5-flash-lite (fast, generous fre
                  gemini-3.8-flash is the higher-quality free alternative
 ```
 
-Free-tier quotas are per Google project and per day; once exhausted the
-tool keeps working on the built-in engine until they reset. `vercel.json`
-raises the route's `maxDuration` to 30 s so a slow model answer is not cut
-off by the platform default. Locally, `npm run dev` serves `/api/*` through
-a small Vite middleware (`vite.config.ts`), so a `.env` with the key is all
-you need to test the AI path.
+### Built-in engine (fallback)
 
-## Built-in engine (fallback)
+`generateHashtags.ts` — deterministic blending per platform: caption keywords
+and bigrams, ~20 curated topic expansions, post-type and tone tags, platform
+norms (Instagram 15, TikTok 6, X 3, LinkedIn 5, YouTube 6, Facebook 4,
+Pinterest 10, Threads 3; #fyp reserved on TikTok; viral/casual tags banned on
+LinkedIn and X; spam-bait banned everywhere), a tag in at most 3 sets, the
+caption's own hashtags never re-suggested.
 
-`src/lib/generateHashtags.ts` — deterministic client-side blending per
-selected platform, used when AI is unavailable and to top up short AI sets:
+## Fitness Challenge Generator for Coaches & Gyms
 
-- caption keyword extraction (frequency-ranked words + honest bigrams that
-  never bridge sentences), topic expansions (~20 curated niches, generic
-  `<topic>life`/`<topic>tips` otherwise), post-type and tone/goal tags
-- platform norms: counts within spec ranges (Instagram 15, TikTok 6, X 3,
-  LinkedIn 5, YouTube 6, Facebook 4, Pinterest 10, Threads 3), reserved
-  staples (#fyp on TikTok), viral/casual tags banned on LinkedIn and X,
-  spam-bait tags banned everywhere, and each block carries a short tip
-- a tag can appear in at most 3 platform sets per generation, and the
-  caption's own hashtags are never re-suggested
-- deterministic per input; Regenerate reshuffles each platform's pool
+B2B lead magnet: a coach picks challenge type(s), audience(s), level(s), then
+duration, equipment and measurement units (two compact screens so nothing
+scrolls), enters an email (mandatory gate, optional "Send me more tools for
+coaches"), and gets a ready-to-run challenge framework: name, subtitle, who
+it's for, objective, how it works, four daily rules, weekly themes, scoring,
+progress tracking, coaching notes and reusable client instructions — plus a
+`Download PDF` button and the 30-day-trial CTA
+(`utm_source=fitness_challenge_generator`).
 
-Validation: caption, at least one platform, name and a valid email —
-compact inline errors, no browser alerts, button disabled until valid.
-
-## HubSpot lead capture
-
-When hashtags are generated, the visitor's **name and email** are POSTed to
-`/api/track`, which forwards them to FitBudd's Hashtag Generator form
-(portal `9058640`, form `e7410680-1ea2-4f36-8f94-bde4cd94aa62`, region na1)
-as `email` + `firstname` — the two fields that form has. Nothing else about
-the generation (caption, platforms, hashtags, CTA clicks) is recorded. The
-portal and form IDs are public (they appear in the form's embed snippet), so
-they are the defaults and tracking works with no configuration. Credentials
-stay in **server** env vars; nothing HubSpot-related ships in the bundle:
-
-```
-HUBSPOT_PORTAL_ID           optional — override the default portal
-HUBSPOT_FORM_ID             optional — override the default form
-HUBSPOT_PRIVATE_APP_TOKEN   optional — uses the authenticated secure-submit endpoint when set
-VITE_TOOL_SOURCE            optional, defaults to hashtag_generator
-VITE_TRACK_IN_DEV           dev only — 'true' sends events from `npm run dev` too
-```
-
-HubSpot rejects a whole submission if it names a field the form does not
-define, so the route reads the form's public definition and sends only the
-fields that exist. `GET /api/track` answers `{ portalId, formId,
-authenticated, formFields, missingFields, requiredButNeverSent }`; with the
-form as it is today both lists are empty, which means it is ready. Leads
-appear as contacts (email + first name) and under Marketing → Forms → the
-form → Submissions. Local dev skips tracking unless `VITE_TRACK_IN_DEV=true`,
-because every event is a real submission. HubSpot rejections are logged in
-the Vercel function logs.
-
-HubSpot errors are logged and swallowed — the tool never blocks on
-tracking. The CTA links to
-`https://dashboard.fitbudd.com/signup?utm_source=hashtag_generator&utm_medium=tool_cta&utm_campaign=lead_conversion`.
+- `generateChallenge.ts` is deterministic and never prescribes exercises,
+  sets, reps or workouts: a challenge is rules, behaviours, targets,
+  accountability mechanics and scoring that layer on top of the coach's
+  existing program. Personalisation: Community Engagement / Online Community
+  → leaderboards and visible check-ins; Corporate → simple participation and
+  team completion rates; Social Media Audience → public prompts and lead-gen
+  use; Mixed Levels → every rule scalable, effort cues relative; No Equipment
+  / Bodyweight Only → no load tracking; both metric and US units selected →
+  both shown (kg / lb, cm / in).
+- `generatePdf.ts` builds the PDF in the browser with jsPDF (loaded on
+  demand): cover, overview, designed-for, duration, objective, how it works,
+  daily rules, weekly plan, client instructions, progress tracking, a
+  day-by-day check-in grid, coach notes, optional scoring. FitBudd orange as
+  the only accent, no sales copy, file name `<challenge-name>.pdf`.
+- The email gate copy promises the preview and the PDF download, not an
+  email: nothing is emailed by the tool itself. A HubSpot workflow on the
+  form can send a follow-up if wanted.
 
 ## Structure
 
 ```
+index.html                         internal index (noindex) → src/hub
+hashtag-generator/index.html       tool page (iframe-resizer child)
+fitness-challenge-generator/index.html
 api/
-  generate.ts                Vercel serverless route → Gemini (key stays server-side)
-  track.ts                   Vercel serverless route → HubSpot Forms API
+  track.ts                         shared HubSpot route: per-tool form + fields
+  generate.ts                      Gemini route for the Hashtag Generator
 src/
-  App.tsx                    536px wrapper
-  components/
-    HashtagGenerator.tsx     form, validation, modal state
-    ResultsModal.tsx         centered results modal (Escape/backdrop/✕ close)
-    PlatformHashtagBlock.tsx per-platform tags + tip + copy
-    HashMark.tsx             orange rounded-square # mark
-    SelectDropdown.tsx       single-select dropdown (closes on pick)
-    MultiSelectChips.tsx     accessible multi-select chip group
-    CTASection.tsx           Turn Content Into Clients CTA
-  lib/
-    aiHashtags.ts            /api/generate client: validates model output, local fallback
-    generateHashtags.ts      deterministic generation engine + shared tag rules
-    tracking.ts              CTA constants + lead (name/email) posting to /api/track
-    copy.ts                  clipboard helper with iframe fallback
-  types.ts                   options + shared types
-vite.config.ts               build config + dev middleware serving api/*.ts locally
-vercel.json                  30 s maxDuration for api/generate.ts
-.env.example                 every env var, documented
+  shared/
+    index.css                      Tailwind theme (FitBudd colours) + iframe rules
+    tools.ts                       tool registry + Webflow embed snippet
+    components/                    MultiSelectChips, SingleSelectChips, SelectDropdown,
+                                   CTASection, HashMark, ToolMark
+    lib/tracking.ts                postEvent, email validation, trial URL
+    lib/copy.ts                    clipboard helper with iframe fallback
+  hub/                             index page
+  tools/hashtag-generator/         HashtagGenerator, ResultsModal, PlatformHashtagBlock,
+                                   generateHashtags, aiHashtags, tracking, types
+  tools/fitness-challenge-generator/
+                                   FitnessChallengeGenerator (steps), SelectionStep,
+                                   EmailGate, ChallengePreview, PDFDownloadButton,
+                                   generateChallenge, generatePdf, tracking, types
+vite.config.ts                     multi-page build + dev middleware serving api/*.ts
+vercel.json                        30 s maxDuration for api/generate.ts
+.env.example                       every env var, documented
 ```
+
+## Adding a tool
+
+1. Create `<slug>/index.html` (copy one of the tool pages) and
+   `src/tools/<slug>/` with `main.tsx`, `App.tsx` and the tool.
+2. Add the entry to `build.rollupOptions.input` in `vite.config.ts`.
+3. Register it in `src/shared/tools.ts` (index page + embed snippet) and in
+   `TOOLS` in `api/track.ts` (which HubSpot fields each event may carry).
+4. Reuse `src/shared` for chips, CTA, tracking and the 536 px card layout.

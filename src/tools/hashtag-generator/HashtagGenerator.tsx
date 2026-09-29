@@ -5,13 +5,13 @@ import {
   TONE_OPTIONS,
   type HashtagFormState,
   type PlatformHashtags,
-} from '../types';
-import { generateWithAi } from '../lib/aiHashtags';
-import { trackGeneration } from '../lib/tracking';
-import { HashMark } from './HashMark';
-import { MultiSelectChips } from './MultiSelectChips';
+} from './types';
+import { generateWithAi } from './aiHashtags';
+import { trackGeneration } from './tracking';
+import { HashMark } from '../../shared/components/HashMark';
+import { MultiSelectChips } from '../../shared/components/MultiSelectChips';
 import { ResultsModal } from './ResultsModal';
-import { SelectDropdown } from './SelectDropdown';
+import { SelectDropdown } from '../../shared/components/SelectDropdown';
 
 const inputCls =
   'w-full rounded-lg border bg-white px-3 text-sm text-gray-900 outline-none transition-colors placeholder:text-gray-400 focus:ring-2';

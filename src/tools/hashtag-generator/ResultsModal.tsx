@@ -1,8 +1,9 @@
 import { useEffect, useId, useRef, useState } from 'react';
-import type { PlatformHashtags } from '../types';
-import { copyText } from '../lib/copy';
-import { CTASection } from './CTASection';
-import { HashMark } from './HashMark';
+import type { PlatformHashtags } from './types';
+import { copyText } from '../../shared/lib/copy';
+import { CTASection } from '../../shared/components/CTASection';
+import { CTA_TEXT, CTA_URL } from './tracking';
+import { HashMark } from '../../shared/components/HashMark';
 import { PlatformHashtagBlock } from './PlatformHashtagBlock';
 
 interface ResultsModalProps {
@@ -132,7 +133,13 @@ export function ResultsModal({
         </div>
 
         <div className="border-t border-gray-100 p-3.5 pt-3">
-          <CTASection />
+          <CTASection
+            headline="Turn Content Into Clients"
+            body="Posting consistently is easier when your business runs on one system. Build your own branded fitness app, manage clients, sell programs, and grow with FitBudd."
+            ctaText={CTA_TEXT}
+            ctaUrl={CTA_URL}
+            microCopy="No credit card required · Built for fitness professionals"
+          />
         </div>
         <span aria-live="polite" className="sr-only">
           {copiedAll ? 'All hashtags copied to clipboard' : ''}

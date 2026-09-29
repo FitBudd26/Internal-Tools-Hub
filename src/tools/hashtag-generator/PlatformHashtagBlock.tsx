@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import type { PlatformHashtags } from '../types';
-import { copyText } from '../lib/copy';
+import type { PlatformHashtags } from './types';
+import { copyText } from '../../shared/lib/copy';
 
 function CopyIcon() {
   return (

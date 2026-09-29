@@ -78,4 +78,15 @@ function vercelApiDev(): Plugin {
 export default defineConfig({
   base: './',
   plugins: [react(), tailwindcss(), vercelApiDev()],
+  build: {
+    // Multi-page app: one entry per tool (each is its own embeddable page)
+    // plus the internal index at the root.
+    rollupOptions: {
+      input: {
+        index: 'index.html',
+        'hashtag-generator': 'hashtag-generator/index.html',
+        'fitness-challenge-generator': 'fitness-challenge-generator/index.html',
+      },
+    },
+  },
 });

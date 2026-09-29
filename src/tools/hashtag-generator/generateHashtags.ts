@@ -4,7 +4,7 @@ import type {
   PlatformHashtags,
   PostType,
   ToneGoal,
-} from '../types';
+} from './types';
 
 /**
  * Deterministic, client-side hashtag generation.

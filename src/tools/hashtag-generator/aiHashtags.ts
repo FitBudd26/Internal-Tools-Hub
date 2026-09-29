@@ -1,5 +1,5 @@
-import type { HashtagFormState, Platform, PlatformHashtags } from '../types';
-import { PLATFORM_OPTIONS } from '../types';
+import type { HashtagFormState, Platform, PlatformHashtags } from './types';
+import { PLATFORM_OPTIONS } from './types';
 import {
   PLATFORM_RANGES,
   captionOwnTags,
