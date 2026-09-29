@@ -58,6 +58,19 @@ export interface ChallengeInput {
   measurements: Measurement[];
 }
 
+/** What the single-screen form holds; mapped to ChallengeInput on submit. */
+export interface ChallengeFormState {
+  challengeTypes: ChallengeType[];
+  audience: AudienceType | null;
+  fitnessLevel: FitnessLevel | null;
+  duration: Duration | null;
+  equipment: Equipment | null;
+  measurements: Measurement[];
+  name: string;
+  email: string;
+  sendMoreTools: boolean;
+}
+
 export interface DailyRule {
   title: string;
   details: string[];

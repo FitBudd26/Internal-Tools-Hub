@@ -4,9 +4,11 @@
  * server env vars — never in the frontend bundle:
  *
  *   HUBSPOT_PORTAL_ID                 optional — defaults to FitBudd's portal
- *   HUBSPOT_FORM_ID                   optional — default form for every tool
  *   HUBSPOT_FORM_ID_<TOOL>            optional — per-tool form override, e.g.
  *                                     HUBSPOT_FORM_ID_FITNESS_CHALLENGE_GENERATOR
+ *   HUBSPOT_FORM_ID                   optional — overrides every tool's default form
+ *   (each tool has its own default form below — the IDs are public, they
+ *   appear in the forms' embed snippets)
  *   HUBSPOT_PRIVATE_APP_TOKEN         optional — switches to the authenticated
  *                                     "secure submit" endpoint when present
  *
@@ -25,7 +27,6 @@
 declare const process: { env: Record<string, string | undefined> };
 
 const DEFAULT_PORTAL_ID = '9058640';
-const DEFAULT_FORM_ID = 'e7410680-1ea2-4f36-8f94-bde4cd94aa62';
 const DEFAULT_TOOL = 'hashtag-generator';
 
 interface EventSpec {
@@ -38,6 +39,8 @@ interface EventSpec {
 interface ToolConfig {
   pageName: string;
   formIdEnv: string;
+  /** This tool's HubSpot form (FitBudd portal); env vars override it. */
+  defaultFormId: string;
   events: Record<string, EventSpec>;
 }
 
@@ -45,6 +48,7 @@ const TOOLS: Record<string, ToolConfig> = {
   'hashtag-generator': {
     pageName: 'Hashtag Generator',
     formIdEnv: 'HUBSPOT_FORM_ID_HASHTAG_GENERATOR',
+    defaultFormId: 'e7410680-1ea2-4f36-8f94-bde4cd94aa62',
     events: {
       // The only data this tool records: the form has exactly these two fields.
       generation: { primary: true, fields: ['email', 'firstname'] },
@@ -53,11 +57,13 @@ const TOOLS: Record<string, ToolConfig> = {
   'fitness-challenge-generator': {
     pageName: 'Fitness Challenge Generator',
     formIdEnv: 'HUBSPOT_FORM_ID_FITNESS_CHALLENGE_GENERATOR',
+    defaultFormId: 'ca6c259d-e274-49fd-8cf0-b5515be51a34',
     events: {
       lead: {
         primary: true,
         fields: [
           'email',
+          'firstname',
           'challenge_types',
           'audience_types',
           'fitness_levels',
@@ -92,7 +98,7 @@ function toolFields(cfg: ToolConfig): string[] {
 function resolveForm(cfg: ToolConfig) {
   return {
     portalId: process.env.HUBSPOT_PORTAL_ID || DEFAULT_PORTAL_ID,
-    formId: process.env[cfg.formIdEnv] || process.env.HUBSPOT_FORM_ID || DEFAULT_FORM_ID,
+    formId: process.env[cfg.formIdEnv] || process.env.HUBSPOT_FORM_ID || cfg.defaultFormId,
     token: process.env.HUBSPOT_PRIVATE_APP_TOKEN,
   };
 }

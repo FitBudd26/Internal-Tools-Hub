@@ -12,11 +12,13 @@ export const CTA_URL = trialUrl(TOOL_SOURCE);
 export function trackLead(
   input: ChallengeInput,
   email: string,
+  name: string,
   sendMoreTools: boolean,
   challenge: Challenge,
 ): void {
   postEvent(TOOL, 'lead', {
     email: email.trim(),
+    firstname: name.trim(),
     challenge_types: input.challengeTypes.join(', '),
     audience_types: input.audienceTypes.join(', '),
     fitness_levels: input.fitnessLevels.join(', '),

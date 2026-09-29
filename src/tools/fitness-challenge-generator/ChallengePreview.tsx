@@ -1,15 +1,5 @@
 import type { ReactNode } from 'react';
 import type { Challenge } from './types';
-import { CTASection } from '../../shared/components/CTASection';
-import { PDFDownloadButton } from './PDFDownloadButton';
-import { CTA_TEXT, CTA_URL } from './tracking';
-
-interface ChallengePreviewProps {
-  challenge: Challenge;
-  onPdfDownloaded: (fileName: string) => void;
-  onCtaClick: () => void;
-  onRestart: () => void;
-}
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -30,21 +20,12 @@ function Bullets({ items }: { items: string[] }) {
   );
 }
 
-export function ChallengePreview({
-  challenge: c,
-  onPdfDownloaded,
-  onCtaClick,
-  onRestart,
-}: ChallengePreviewProps) {
+/** On-screen preview of the generated framework (content only; the modal adds PDF + CTA). */
+export function ChallengePreview({ challenge: c }: { challenge: Challenge }) {
   return (
-    <div className="flex flex-col gap-2">
+    <>
       <div className="rounded-xl border border-fb-tint-border bg-fb-tint p-3">
-        <p className="text-[11px] font-bold uppercase tracking-wide text-fb-teal">
-          Your Ready-to-Run Fitness Challenge
-        </p>
-        <h2 className="mt-0.5 text-base font-bold leading-tight text-gray-900">
-          {c.challengeName}
-        </h2>
+        <h3 className="text-base font-bold leading-tight text-gray-900">{c.challengeName}</h3>
         <p className="mt-0.5 text-[13px] text-gray-600">{c.subtitle}</p>
         <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-[12px]">
           <dt className="font-semibold text-gray-900">Who it’s for</dt>
@@ -118,29 +99,6 @@ export function ChallengePreview({
           ))}
         </div>
       </details>
-
-      <PDFDownloadButton challenge={c} onDownloaded={onPdfDownloaded} />
-      <p className="-mt-1 text-center text-[11px] text-gray-400">
-        Client-ready, branding-neutral PDF with a day-by-day check-in tracker
-      </p>
-
-      <CTASection
-        headline="Run this challenge inside your own branded fitness app."
-        body="You created the challenge. Now deploy it to clients with daily tasks, check-ins, streaks and results in one place."
-        ctaText={CTA_TEXT}
-        ctaUrl={CTA_URL}
-        onCtaClick={onCtaClick}
-        microCopy="No credit card required · 30-day free trial"
-        socialProof="Trusted by 10,000+ fitness coaches, personal trainers, gym owners, and studios growing with FitBudd every day."
-      />
-
-      <button
-        type="button"
-        onClick={onRestart}
-        className="mx-auto rounded text-[13px] font-medium text-gray-500 transition-colors hover:text-gray-800 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fb-orange"
-      >
-        ↻ Create another challenge
-      </button>
-    </div>
+    </>
   );
 }

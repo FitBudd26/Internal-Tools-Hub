@@ -7,6 +7,7 @@ interface SelectDropdownProps<T extends string> {
   options: readonly T[];
   selected: T | null;
   onChange: (next: T | null) => void;
+  required?: boolean;
 }
 
 function ChevronIcon({ open }: { open: boolean }) {
@@ -60,6 +61,7 @@ export function SelectDropdown<T extends string>({
   options,
   selected,
   onChange,
+  required = false,
 }: SelectDropdownProps<T>) {
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -110,6 +112,12 @@ export function SelectDropdown<T extends string>({
         {label}
         {labelHint && (
           <span className="font-normal text-gray-400"> {labelHint}</span>
+        )}
+        {required && (
+          <span className="text-fb-orange" aria-hidden="true">
+            {' '}
+            *
+          </span>
         )}
       </span>
       <button

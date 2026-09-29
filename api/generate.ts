@@ -4,7 +4,9 @@
  * nothing Gemini-related ships in the frontend bundle:
  *
  *   GEMINI_API_KEY   required — without it this route answers 503 and the
- *                    client quietly uses the built-in deterministic engine
+ *                    client quietly uses the built-in deterministic engine.
+ *                    GOOGLE_API_KEY and the other names in KEY_ENV_NAMES are
+ *                    accepted too, so an existing Vercel variable just works.
  *   GEMINI_MODEL     optional, defaults to gemini-3.5-flash-lite (free tier,
  *                    fast); gemini-3.8-flash is the higher-quality free option
  *
@@ -17,6 +19,24 @@
 declare const process: { env: Record<string, string | undefined> };
 
 const DEFAULT_MODEL = 'gemini-3.5-flash-lite';
+
+/** Env var names accepted for the Gemini key; the first one set wins. */
+const KEY_ENV_NAMES = [
+  'GEMINI_API_KEY',
+  'GOOGLE_API_KEY',
+  'GOOGLE_GENERATIVE_AI_API_KEY',
+  'GOOGLE_GEMINI_API_KEY',
+  'GEMINI_KEY',
+  'VITE_GEMINI_API_KEY',
+];
+
+function findKey(): { key: string | null; source: string | null } {
+  for (const name of KEY_ENV_NAMES) {
+    const value = process.env[name]?.trim();
+    if (value) return { key: value, source: name };
+  }
+  return { key: null, source: null };
+}
 const UPSTREAM_TIMEOUT_MS = 12_000;
 
 const PLATFORMS = [
@@ -171,12 +191,17 @@ export default async function handler(
   res: GenerateResponse,
 ): Promise<void> {
   res.setHeader('Cache-Control', 'no-store');
-  const key = process.env.GEMINI_API_KEY;
+  const { key, source } = findKey();
   const model = process.env.GEMINI_MODEL || DEFAULT_MODEL;
 
-  // Deploy check: `curl https://<app>/api/generate` → { configured, model }.
+  // Deploy check: `curl https://<app>/api/generate` → which env var holds the key (names only, never values).
   if (req.method === 'GET') {
-    res.status(200).json({ configured: Boolean(key), model });
+    res.status(200).json({
+      configured: Boolean(key),
+      model,
+      keySource: source,
+      acceptedKeyNames: KEY_ENV_NAMES,
+    });
     return;
   }
   if (req.method !== 'POST') {
