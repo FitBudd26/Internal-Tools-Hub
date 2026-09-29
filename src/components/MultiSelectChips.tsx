@@ -43,7 +43,7 @@ export function MultiSelectChips<T extends string>({
 
   return (
     <div>
-      <span className="mb-1.5 block text-sm font-bold text-gray-900">
+      <span className="mb-1 block text-sm font-bold text-gray-900">
         {label}
         {required && (
           <span className="text-fb-orange" aria-hidden="true">
@@ -65,7 +65,7 @@ export function MultiSelectChips<T extends string>({
               type="button"
               aria-pressed={isSelected}
               onClick={() => toggle(option)}
-              className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[13px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-fb-orange ${
+              className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-fb-orange ${
                 isSelected
                   ? 'border-fb-orange bg-fb-orange text-white'
                   : 'border-gray-300 bg-white text-gray-700 hover:border-fb-accent hover:text-gray-900'

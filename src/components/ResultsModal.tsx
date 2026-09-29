@@ -10,6 +10,8 @@ interface ResultsModalProps {
   results: PlatformHashtags[];
   onClose: () => void;
   onRegenerate: () => void;
+  /** True while a fresh set is being fetched; disables Regenerate. */
+  regenerating?: boolean;
 }
 
 function CloseIcon() {
@@ -31,6 +33,7 @@ export function ResultsModal({
   results,
   onClose,
   onRegenerate,
+  regenerating = false,
 }: ResultsModalProps) {
   const titleId = useId();
   const panelRef = useRef<HTMLDivElement>(null);
@@ -120,9 +123,11 @@ export function ResultsModal({
           <button
             type="button"
             onClick={onRegenerate}
-            className="mx-auto rounded text-[13px] font-medium text-gray-500 transition-colors hover:text-gray-800 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fb-orange"
+            disabled={regenerating}
+            aria-busy={regenerating}
+            className="mx-auto rounded text-[13px] font-medium text-gray-500 transition-colors hover:text-gray-800 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fb-orange disabled:cursor-wait disabled:opacity-60 disabled:hover:no-underline"
           >
-            ↻ Regenerate
+            {regenerating ? 'Regenerating…' : '↻ Regenerate'}
           </button>
         </div>
 

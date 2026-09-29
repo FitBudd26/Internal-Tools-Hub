@@ -106,7 +106,7 @@ export function SelectDropdown<T extends string>({
 
   return (
     <div ref={wrapRef} className="relative">
-      <span className="mb-1.5 block text-sm font-bold text-gray-900">
+      <span className="mb-1 block text-sm font-bold text-gray-900">
         {label}
         {labelHint && (
           <span className="font-normal text-gray-400"> {labelHint}</span>

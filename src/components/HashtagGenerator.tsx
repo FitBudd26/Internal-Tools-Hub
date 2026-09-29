@@ -6,7 +6,7 @@ import {
   type HashtagFormState,
   type PlatformHashtags,
 } from '../types';
-import { generateHashtags } from '../lib/generateHashtags';
+import { generateWithAi } from '../lib/aiHashtags';
 import { trackGeneration } from '../lib/tracking';
 import { HashMark } from './HashMark';
 import { MultiSelectChips } from './MultiSelectChips';
@@ -18,6 +18,8 @@ const inputCls =
 const validCls =
   'border-gray-300 focus:border-fb-orange focus:ring-fb-orange/25';
 const invalidCls = 'border-red-400 focus:border-red-400 focus:ring-red-300/40';
+
+type Pending = 'idle' | 'generate' | 'regenerate';
 
 export function HashtagGenerator() {
   const [form, setForm] = useState<HashtagFormState>({
@@ -32,6 +34,7 @@ export function HashtagGenerator() {
   const [results, setResults] = useState<PlatformHashtags[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
   const [variant, setVariant] = useState(0);
+  const [pending, setPending] = useState<Pending>('idle');
 
   const captionValid = form.caption.trim().length > 0;
   const platformsValid = form.platforms.length > 0;
@@ -39,22 +42,37 @@ export function HashtagGenerator() {
 
   const captionError = captionTouched && !captionValid;
   const platformsError = platformsTouched && !platformsValid;
+  const generating = pending === 'generate';
 
-  const handleGenerate = (e: FormEvent<HTMLFormElement>) => {
+  const handleGenerate = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!isValid) return;
-    const generated = generateHashtags(form, 0);
-    setResults(generated);
-    setVariant(0);
-    setModalOpen(true);
-    // Optional HubSpot usage tracking; fire-and-forget, never blocks results.
-    trackGeneration(form, generated);
+    if (!isValid || pending !== 'idle') return;
+    setPending('generate');
+    try {
+      // Gemini via /api/generate when configured; the local engine otherwise.
+      const { groups } = await generateWithAi(form, 0);
+      setResults(groups);
+      setVariant(0);
+      setModalOpen(true);
+      // Optional HubSpot usage tracking; fire-and-forget, never blocks results.
+      trackGeneration(form, groups);
+    } finally {
+      setPending('idle');
+    }
   };
 
-  const handleRegenerate = () => {
+  const handleRegenerate = async () => {
+    if (pending !== 'idle') return;
     const next = variant + 1;
-    setVariant(next);
-    setResults(generateHashtags(form, next));
+    setPending('regenerate');
+    try {
+      const shown = results.flatMap((g) => g.tags);
+      const { groups } = await generateWithAi(form, next, shown);
+      setVariant(next);
+      setResults(groups);
+    } finally {
+      setPending('idle');
+    }
   };
 
   return (
@@ -62,7 +80,7 @@ export function HashtagGenerator() {
       <div className="flex min-h-[440px] flex-col">
         <form
           onSubmit={handleGenerate}
-          className="flex flex-1 flex-col gap-3.5"
+          className="flex flex-1 flex-col gap-2.5"
           noValidate
         >
           <div>
@@ -77,7 +95,7 @@ export function HashtagGenerator() {
 
           <div>
             <label className="block">
-              <span className="mb-1.5 block text-sm font-bold text-gray-900">
+              <span className="mb-1 block text-sm font-bold text-gray-900">
                 Caption
                 <span className="text-fb-orange" aria-hidden="true">
                   {' '}
@@ -86,7 +104,7 @@ export function HashtagGenerator() {
               </span>
               <textarea
                 required
-                rows={3}
+                rows={2}
                 placeholder="Paste your post caption here"
                 value={form.caption}
                 onChange={(e) =>
@@ -94,7 +112,7 @@ export function HashtagGenerator() {
                 }
                 onBlur={() => setCaptionTouched(true)}
                 aria-invalid={captionError}
-                className={`${inputCls} h-[80px] resize-none py-2 ${captionError ? invalidCls : validCls}`}
+                className={`${inputCls} h-[60px] resize-none py-2 ${captionError ? invalidCls : validCls}`}
               />
             </label>
             {captionError && (
@@ -105,8 +123,8 @@ export function HashtagGenerator() {
           </div>
 
           <label className="block">
-            <span className="mb-1.5 block text-sm font-bold text-gray-900">
-              Topic / Niche / Keyword{' '}
+            <span className="mb-1 block text-sm font-bold text-gray-900">
+              Topic/Niche/Keyword{' '}
               <span className="font-normal text-gray-400">(recommended)</span>
             </span>
             <input
@@ -121,7 +139,7 @@ export function HashtagGenerator() {
           </label>
 
           <SelectDropdown
-            label="Post Type / Context"
+            label="Post Type/Context"
             labelHint="(optional)"
             placeholder="Select post type"
             options={POST_TYPE_OPTIONS}
@@ -148,7 +166,7 @@ export function HashtagGenerator() {
           </div>
 
           <MultiSelectChips
-            label="Tone / Goal"
+            label="Tone/Goal"
             options={TONE_OPTIONS}
             selected={form.tones}
             onChange={(tones) => setForm((f) => ({ ...f, tones }))}
@@ -157,12 +175,17 @@ export function HashtagGenerator() {
           <div className="mt-auto">
             <button
               type="submit"
-              disabled={!isValid}
-              className="h-[46px] w-full rounded-xl bg-fb-orange text-sm font-semibold text-white transition-colors enabled:hover:bg-fb-accent-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fb-orange disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-400"
+              disabled={!isValid || pending !== 'idle'}
+              aria-busy={generating}
+              className={`h-[46px] w-full rounded-xl bg-fb-orange text-sm font-semibold text-white transition-colors enabled:hover:bg-fb-accent-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fb-orange ${
+                generating
+                  ? 'cursor-wait opacity-80'
+                  : 'disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-400'
+              }`}
             >
-              Generate Hashtags
+              {generating ? 'Generating…' : 'Generate Hashtags'}
             </button>
-            <p className="mt-1.5 text-center text-xs text-gray-400">
+            <p className="mt-1 text-center text-xs text-gray-400">
               Optimized for each platform
             </p>
           </div>
@@ -172,6 +195,7 @@ export function HashtagGenerator() {
       <ResultsModal
         open={modalOpen}
         results={results}
+        regenerating={pending === 'regenerate'}
         onClose={() => setModalOpen(false)}
         onRegenerate={handleRegenerate}
       />

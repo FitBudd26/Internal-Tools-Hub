@@ -169,6 +169,28 @@ const PLATFORM_SPECS: Record<Platform, PlatformSpec> = {
   },
 };
 
+/** Spec count ranges per platform; AI output is kept inside these. */
+export const PLATFORM_RANGES: Record<Platform, { min: number; max: number }> = {
+  Instagram: { min: 12, max: 20 },
+  TikTok: { min: 5, max: 8 },
+  'Twitter/X': { min: 2, max: 4 },
+  LinkedIn: { min: 3, max: 6 },
+  YouTube: { min: 5, max: 10 },
+  Facebook: { min: 3, max: 6 },
+  Pinterest: { min: 8, max: 15 },
+  Threads: { min: 2, max: 5 },
+};
+
+/** The platform's one-line tip (shared with the AI path). */
+export function platformTip(platform: Platform): string {
+  return PLATFORM_SPECS[platform].tip;
+}
+
+/** Whether a (clean) tag is disallowed on this platform, e.g. #fyp on LinkedIn. */
+export function isBannedOn(platform: Platform, tag: string): boolean {
+  return PLATFORM_SPECS[platform].banned.has(tag);
+}
+
 /* ---------------------------------- utils --------------------------------- */
 
 function hashString(s: string): number {
@@ -192,7 +214,7 @@ function mulberry32(seed: number): () => number {
 }
 
 /** Normalize a raw candidate into a valid tag, or null. */
-function cleanTag(raw: string): string | null {
+export function cleanTag(raw: string): string | null {
   const tag = raw.toLowerCase().replace(/[^a-z0-9]/g, '');
   if (tag.length < 3 || tag.length > MAX_TAG_LEN) return null;
   if (!/^[a-z]/.test(tag)) return null;
@@ -262,6 +284,11 @@ function extractCaptionTags(caption: string): {
     .slice(0, 6);
 
   return { words, bigrams: bigrams.slice(0, 3), existing };
+}
+
+/** Hashtags the caption already contains — never re-suggested. */
+export function captionOwnTags(caption: string): Set<string> {
+  return extractCaptionTags(caption).existing;
 }
 
 /** Topic field → direct tags plus curated or generic expansions. */

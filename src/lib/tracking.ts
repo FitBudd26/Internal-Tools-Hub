@@ -22,8 +22,9 @@ export const CTA_URL =
   `&utm_campaign=${CAMPAIGN}`;
 
 function post(type: string, fields: Record<string, string>): void {
-  // The serverless route only exists on the deployed app; skip in dev.
-  if (import.meta.env.DEV) return;
+  // Dev runs skip tracking so local testing doesn't pollute the CRM, unless
+  // VITE_TRACK_IN_DEV=true is set to verify the HubSpot wiring end to end.
+  if (import.meta.env.DEV && import.meta.env.VITE_TRACK_IN_DEV !== 'true') return;
   try {
     void fetch('/api/track', {
       method: 'POST',
