@@ -273,12 +273,28 @@ function liquid(ml: number): string {
  * "250 ml (1 cup) milk" → millilitres with a recomputed cup, tbsp or fl oz figure.
  * Cup figures for solids drift by 20-40% depending on the ingredient, so solids never get cups.
  */
+/** Spoon figure for small solid amounts (spices, seeds, nut butter), using the food's own spoon weight when known. */
+function spoons(g: number, food: Food | null): string {
+  const perTsp = food?.tsp ?? (food?.tbsp ? food.tbsp / 3 : 2.5);
+  const tsp = g / perTsp;
+  if (tsp >= 3) return `${fmt(Math.round((tsp / 3) * 2) / 2)} tbsp`;
+  return `${fmt(Math.max(0.25, Math.round(tsp * 4) / 4))} tsp`;
+}
+
 export function normalizeQuantities(line: string): string {
   const m = /^(\d+(?:\.\d+)?)\s*(g|ml)\b\s*(?:\([^)]*\))?\s*(.*)$/i.exec(line.trim());
   if (!m) return line;
   const n = Number(m[1]);
   const unit = m[2].toLowerCase();
-  return `${m[1]} ${unit} (${unit === 'g' ? ounces(n) : liquid(n)}) ${m[3]}`.replace(/\s+/g, ' ').trim();
+  const rest = m[3];
+  let us: string;
+  if (unit === 'ml') us = liquid(n);
+  else {
+    const food = findFood(rest.toLowerCase());
+    // Spices, seeds and nut butters are measured in spoons, never "0 oz".
+    us = n < 15 || (food?.tbsp && n <= 2.2 * food.tbsp) ? spoons(n, food) : ounces(n);
+  }
+  return `${m[1]} ${unit} (${us}) ${rest}`.replace(/\s+/g, ' ').trim();
 }
 
 /* ------------------------------ numerals ------------------------------ */
