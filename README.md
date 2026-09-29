@@ -273,9 +273,14 @@ Download PDF, "Regenerate with different recipes", a disclaimer, and the CTA
   floor and says so on screen and in the PDF. The disclaimer covers the
   target. Only the resulting calorie targets reach the AI; the profile is
   never stored or sent to HubSpot.
-- White-label PDF: an optional coach logo (PNG/JPG, read in the browser)
+- White-label PDF: an optional coach logo (PNG/JPG, read in the browser,
+  downscaled to 600 px and flattened onto white so the PDF stays small)
   replaces the FitBudd logo in the header; FitBudd stays in the footer
   credit. Placeholder business names ("abc", "test") are left off.
+- When Gemini still returns a recipe that breaks a rule (a bean-only lunch
+  under the protein floor, for instance) the client drops it and fills the
+  slot from the library, so the coach never sees it; the model's compliance
+  is good but not perfect on gemini-3.5-flash-lite.
 - `generateRecipes.ts`: a 40-recipe library (quantities as numerals, metric
   first with the US measure in parentheses) filtered by protein, diet, meal
   type and time and ranked by goal fit and closeness to the per-meal calorie
