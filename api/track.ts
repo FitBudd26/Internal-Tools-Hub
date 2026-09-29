@@ -89,6 +89,38 @@ const TOOLS: Record<string, ToolConfig> = {
       },
     },
   },
+  'ig-bio-generator': {
+    pageName: 'Instagram Bio Generator',
+    formIdEnv: 'HUBSPOT_FORM_ID_IG_BIO_GENERATOR',
+    defaultFormId: '8ec4d71b-21b7-4639-9849-e47ae5bea96d',
+    events: {
+      generation: {
+        primary: true,
+        fields: [
+          'email',
+          'firstname',
+          'business_type',
+          'years_experience',
+          'location',
+          'specializations',
+          'target_audience',
+          'unique_selling_point',
+          'tone_preference',
+          'generation_count',
+          'generated_bios',
+          'generated_usernames',
+          'tool_source',
+          'campaign',
+          'page_url',
+          'submitted_at',
+        ],
+      },
+      cta_click: {
+        primary: false,
+        fields: ['email', 'cta_clicked', 'cta_text', 'cta_url', 'cta_clicked_at', 'tool_source', 'page_url'],
+      },
+    },
+  },
   'recipe-generator': {
     pageName: 'Recipe Generator',
     formIdEnv: 'HUBSPOT_FORM_ID_RECIPE_GENERATOR',

@@ -24,6 +24,13 @@ export const TOOLS: ToolMeta[] = [
     fallbackHeight: 580,
   },
   {
+    slug: 'ig-bio-generator',
+    name: 'Instagram Bio Generator',
+    description:
+      'Four ready-to-paste bios in four angles plus username ideas for fitness professionals (Gemini with a templated fallback). Captures name + email. Migrated from ig-bio-gen.vercel.app.',
+    fallbackHeight: 580,
+  },
+  {
     slug: 'recipe-generator',
     name: 'Fitness Recipe Generator for Coaches & Gyms',
     description:

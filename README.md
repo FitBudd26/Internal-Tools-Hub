@@ -10,6 +10,7 @@ tool with its embed snippet.
 | --- | --- | --- | --- |
 | Hashtag Generator | `/hashtag-generator/` | Platform-tailored hashtag sets from a caption (Gemini, with a deterministic fallback), shown in a modal with copy buttons and a CTA | name + email |
 | Fitness Challenge Generator for Coaches & Gyms | `/fitness-challenge-generator/` | Same single-screen design as the Hashtag Generator (dropdowns + name/email) → ready-to-run client challenge framework in the results modal (Gemini with a deterministic fallback), with a branded PDF download and a 30-day-trial CTA | name + email (selections too once its form has the fields) |
+| Instagram Bio Generator | `/ig-bio-generator/` | Migrated from ig-bio-gen.vercel.app into the shared shell: business type, audience, specializations, tone, experience, location and USP → four bios in four angles (authority, results, community, value) within Instagram's 150 characters, plus eight username ideas; Gemini with the original templated engine as fallback | name + email (the original custom fields too once the form has them) |
 | Fitness Recipe Generator for Coaches & Gyms | `/recipe-generator/` | Same design → three distinct, goal-aligned recipes that honour every dietary restriction and the coach's notes (Gemini with a 40-recipe library as fallback), approximate nutrition, coach notes, a logo-branded PDF, disclaimer and a free-trial CTA | name + email (selections too once its form has the fields) |
 
 **Stack:** React 19 · TypeScript · Tailwind CSS v4 · Vite (multi-page) ·
@@ -82,7 +83,8 @@ allowed fields to HubSpot's Forms Submission API. Defaults: FitBudd's portal
 `9058640` (region na1) and one form per tool, Hashtag Generator
 `e7410680-1ea2-4f36-8f94-bde4cd94aa62`, Challenge Generator
 `ca6c259d-e274-49fd-8cf0-b5515be51a34`, Recipe Generator
-`b2222d23-1400-4bec-a812-e818740c59f5`. The IDs are public (they appear in
+`b2222d23-1400-4bec-a812-e818740c59f5`, Instagram Bio Generator
+`8ec4d71b-21b7-4639-9849-e47ae5bea96d`. The IDs are public (they appear in
 the forms' embed snippets). Nothing HubSpot-related ships in the bundle.
 
 ```
@@ -91,6 +93,7 @@ HUBSPOT_FORM_ID                               optional, overrides every tool's d
 HUBSPOT_FORM_ID_HASHTAG_GENERATOR             optional, per-tool form
 HUBSPOT_FORM_ID_FITNESS_CHALLENGE_GENERATOR   optional, per-tool form
 HUBSPOT_FORM_ID_RECIPE_GENERATOR              optional, per-tool form
+HUBSPOT_FORM_ID_IG_BIO_GENERATOR              optional, per-tool form
 HUBSPOT_PRIVATE_APP_TOKEN                     optional, authenticated secure-submit endpoint
 VITE_TRACK_IN_DEV                             dev only, 'true' sends events from `npm run dev`
 ```
@@ -106,6 +109,13 @@ What each tool sends:
   `page_url`, `submitted_at`. Then `pdf_download` (`pdf_downloaded`,
   `pdf_downloaded_at`, `challenge_name`) and `cta_click` (`cta_clicked`,
   `cta_text`, `cta_url`, `cta_clicked_at`), each with the email.
+- **Instagram Bio Generator**, `generation` (on Generate): `email`,
+  `firstname`, `business_type`, `years_experience`, `location`,
+  `specializations`, `target_audience`, `unique_selling_point`,
+  `tone_preference`, `generation_count`, `generated_bios`,
+  `generated_usernames`, `tool_source`, `campaign`, `page_url`,
+  `submitted_at`; then `cta_click`. Its form is
+  `8ec4d71b-21b7-4639-9849-e47ae5bea96d`.
 - **Recipe Generator**, `lead` (on Generate Recipes): `email`, `firstname`,
   `client_goal`, `preferred_protein`, `dietary_preference`, `meal_type`,
   `cooking_time`, `notes`, `generated_recipes`, `tool_source`, `campaign`
@@ -298,6 +308,28 @@ Download PDF, "Regenerate with different recipes", a disclaimer, and the CTA
   The tool spec removed serving size on purpose; the later review asked for
   it back.
 
+## Instagram Bio Generator
+
+Migrated from the standalone IG-Bio-Gen repo (ig-bio-gen.vercel.app). Same
+inputs as before, now in the hub shell: Business Type and Target Audience
+(dropdowns, required), Specializations (multi-select) and Tone (dropdown
+with Auto), Years of Experience and Location, a USP textarea, then Name /
+Business Name and Email. Results open in the shared modal: four bios in
+four angles with a live character count and Copy, eight username ideas as
+tap-to-copy chips with an availability caveat, Regenerate, the free-trial
+CTA and a "Book a free demo" link (the original CTA).
+
+- Gemini-first (`aiBios.ts`): the prompt asks for four bios under 140
+  characters (headroom under Instagram's 150) in the four angles and the
+  requested tone, plus eight handle ideas that follow Instagram's rules.
+  Every bio is re-counted by grapheme (an emoji is one character), dashes
+  and hashtags are stripped, over-long or duplicate bios are dropped, handles
+  are sanitised, and anything short is topped up from the engine.
+- `generateBios.ts`: the original templated engine, ported unchanged in
+  content but made deterministic and seedable (Regenerate rotates variants),
+  with Auto tone inference; plus `generateUsernames`, which builds handles
+  from the name, niche, business type and location.
+
 ## Structure
 
 ```
@@ -305,6 +337,7 @@ index.html                         internal index (noindex) → src/hub
 hashtag-generator/index.html       tool page (iframe-resizer child)
 fitness-challenge-generator/index.html
 recipe-generator/index.html
+ig-bio-generator/index.html
 api/
   track.ts                         shared HubSpot route: per-tool form + fields
   generate.ts                      shared Gemini route: hashtags, challenge, recipes
@@ -327,6 +360,8 @@ src/
                                    FitnessChallengeGenerator (form), ChallengeModal,
                                    ChallengePreview, aiChallenge, generateChallenge,
                                    generatePdf, tracking, types
+  tools/ig-bio-generator/          IgBioGenerator (form), BioResultsModal, BioCard,
+                                   aiBios, generateBios (+ usernames), tracking, types
   tools/recipe-generator/          RecipeGenerator (form), RecipeModal, RecipeCard,
                                    aiRecipes, generateRecipes (library), nutrition
                                    (estimator + protein rules), calorieTarget,

@@ -11,7 +11,7 @@
  *   GEMINI_MODEL     optional, defaults to gemini-3.5-flash-lite (free tier,
  *                    fast); gemini-3.8-flash is the higher-quality free option
  *
- * Request body: { tool: 'hashtags' | 'challenge' | 'recipes', ...input }.
+ * Request body: { tool: 'hashtags' | 'challenge' | 'recipes' | 'igbio', ...input }.
  * Each client re-validates what the model returns, so this route only has
  * to return well-formed JSON. Any non-200 answer makes the client fall back
  * to its local engine, so users always get results.
@@ -422,7 +422,75 @@ const recipes: ToolSpec = {
   },
 };
 
-const TOOLS: Record<string, ToolSpec> = { hashtags, challenge, recipes };
+/* --------------------------------- igbio ---------------------------------- */
+
+const igbio: ToolSpec = {
+  maxOutputTokens: 2048,
+  parse(o) {
+    const name = str(o.name, 80);
+    const businessType = str(o.businessType, 60);
+    const targetAudience = str(o.targetAudience, 40);
+    if (!name || !businessType || !targetAudience) return null;
+    return {
+      name,
+      businessType,
+      yearsExperience: str(o.yearsExperience, 20),
+      location: str(o.location, 60),
+      specializations: strings(o.specializations, 10, 40),
+      targetAudience,
+      uniqueSellingPoint: str(o.uniqueSellingPoint, 300),
+      tone: str(o.tone, 40) || 'Professional & Credible',
+      variant: num(o.variant, 0, 99) ?? 0,
+      avoidBios: strings(o.avoidBios, 8, 200),
+      avoidUsernames: strings(o.avoidUsernames, 16, 40),
+    };
+  },
+  prompt(input) {
+    const i = input as { name: string; businessType: string; yearsExperience: string; location: string; specializations: string[]; targetAudience: string; uniqueSellingPoint: string; tone: string; variant: number; avoidBios: string[]; avoidUsernames: string[] };
+    return [
+      'You write Instagram bios and username ideas for a fitness professional. Reply with JSON only, matching the schema: {"bios":["...","...","...","..."],"usernames":["...", ...]}.',
+      '',
+      `Name or brand: ${i.name}`,
+      `Business type: ${i.businessType}`,
+      `Target audience: ${i.targetAudience}`,
+      `Specialisations: ${i.specializations.join(', ') || 'not given'}`,
+      `Years of experience: ${i.yearsExperience || 'not given'}`,
+      `Location: ${i.location || 'not given'}`,
+      `Unique selling point: ${i.uniqueSellingPoint || 'not given'}`,
+      `Tone: ${i.tone}`,
+      `Variation seed: ${i.variant} (make this set read differently from other seeds for the same inputs).`,
+      '',
+      'Bios: exactly 4, each a different angle in this order: authority and credentials, client results, community and belonging, value and approach.',
+      '- Hard limit 140 characters per bio including spaces and emojis (Instagram allows 150; leave headroom). Count carefully; shorter is better than cut off.',
+      '- One line, no line breaks, no hashtags, no quotation marks, no em or en dashes. End with one or two fitting emojis, no more.',
+      '- Speak to the target audience in the requested tone; weave in the specialisations, the years of experience and the location when given; use the selling point when it is short enough to read cleanly.',
+      '- Do not start with the name (the profile shows the name already). No generic filler like "fitness enthusiast" or "living my best life".',
+      'Usernames: exactly 8 Instagram handle ideas based on the name or brand, the niche, the business type and the location.',
+      '- Lowercase letters, digits, periods and underscores only; 3-30 characters; no leading, trailing or doubled periods; no @.',
+      '- Easy to say out loud and type; mix short brand handles with descriptive ones (e.g. coach.sam, samleefit, train.with.sam, samlee.strength); avoid numbers unless they are part of the brand.',
+      ...(i.avoidBios.length ? [`- Do not reuse these bios or close variations: ${i.avoidBios.map((b) => `"${b}"`).join(' | ')}`] : []),
+      ...(i.avoidUsernames.length ? [`- Do not reuse these usernames: ${i.avoidUsernames.join(', ')}`] : []),
+      ...STYLE_RULES.map((r) => `- ${r}`),
+    ].join('\n');
+  },
+  schema: {
+    type: 'OBJECT',
+    properties: {
+      bios: { type: 'ARRAY', items: { type: 'STRING' } },
+      usernames: { type: 'ARRAY', items: { type: 'STRING' } },
+    },
+    required: ['bios', 'usernames'],
+  },
+  normalize(parsed) {
+    if (!parsed || typeof parsed !== 'object') return null;
+    const o = parsed as Record<string, unknown>;
+    const bios = strings(o.bios, 8, 220);
+    const usernames = strings(o.usernames, 16, 40).map((u) => u.replace(/^@/, '').toLowerCase());
+    return bios.length || usernames.length ? { bios, usernames } : null;
+  },
+};
+
+const TOOLS: Record<string, ToolSpec> = { hashtags, challenge, recipes, igbio };
 
 /* -------------------------------- handler -------------------------------- */
 
