@@ -211,11 +211,14 @@ export function generateBios(data: BioInput, variant = 0): GeneratedBio[] {
   const usp = uspSnippet(data.uniqueSellingPoint);
   const emojiPairs = shuffle(tone.emojiPairs, rng);
   const seen = new Set<string>();
+  // The selling point leads at most two of the four bios, so the set does not read as four copies.
+  const uspStyles = new Set(shuffle(['authority', 'results', 'community', 'value'] as Style[], rng).slice(0, 2));
   return (['authority', 'results', 'community', 'value'] as Style[]).map((style, i) => {
-    let bio = buildBio(style, { audience: pick(audienceList, rng), spec: pick(specPool, rng), descriptor: pick(tone.descriptors, rng), usp, verbs: shuffle(FITNESS_VERBS, rng), result: pick(RESULT_PHRASES, rng) }, emojiPairs[i % emojiPairs.length]);
+    const uspHere = uspStyles.has(style) ? usp : null;
+    let bio = buildBio(style, { audience: pick(audienceList, rng), spec: pick(specPool, rng), descriptor: pick(tone.descriptors, rng), usp: uspHere, verbs: shuffle(FITNESS_VERBS, rng), result: pick(RESULT_PHRASES, rng) }, emojiPairs[i % emojiPairs.length]);
     let attempts = 0;
     while (seen.has(bio.text) && attempts < 5) {
-      bio = buildBio(style, { audience: pick(audienceList, rng), spec: pick(specPool, rng), descriptor: pick(tone.descriptors, rng), usp, verbs: shuffle(FITNESS_VERBS, rng), result: pick(RESULT_PHRASES, rng) }, emojiPairs[i % emojiPairs.length]);
+      bio = buildBio(style, { audience: pick(audienceList, rng), spec: pick(specPool, rng), descriptor: pick(tone.descriptors, rng), usp: uspHere, verbs: shuffle(FITNESS_VERBS, rng), result: pick(RESULT_PHRASES, rng) }, emojiPairs[i % emojiPairs.length]);
       attempts++;
     }
     seen.add(bio.text);
