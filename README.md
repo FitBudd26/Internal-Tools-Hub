@@ -81,7 +81,8 @@ Every tool posts `{ tool, type, fields }` to `/api/track`, which forwards the
 allowed fields to HubSpot's Forms Submission API. Defaults: FitBudd's portal
 `9058640` (region na1) and one form per tool, Hashtag Generator
 `e7410680-1ea2-4f36-8f94-bde4cd94aa62`, Challenge Generator
-`ca6c259d-e274-49fd-8cf0-b5515be51a34`. The IDs are public (they appear in
+`ca6c259d-e274-49fd-8cf0-b5515be51a34`, Recipe Generator
+`b2222d23-1400-4bec-a812-e818740c59f5`. The IDs are public (they appear in
 the forms' embed snippets). Nothing HubSpot-related ships in the bundle.
 
 ```
@@ -89,7 +90,7 @@ HUBSPOT_PORTAL_ID                             optional, override the portal
 HUBSPOT_FORM_ID                               optional, overrides every tool's default form
 HUBSPOT_FORM_ID_HASHTAG_GENERATOR             optional, per-tool form
 HUBSPOT_FORM_ID_FITNESS_CHALLENGE_GENERATOR   optional, per-tool form
-HUBSPOT_FORM_ID_RECIPE_GENERATOR              optional, per-tool form (defaults to the hashtag form until one is created)
+HUBSPOT_FORM_ID_RECIPE_GENERATOR              optional, per-tool form
 HUBSPOT_PRIVATE_APP_TOKEN                     optional, authenticated secure-submit endpoint
 VITE_TRACK_IN_DEV                             dev only, 'true' sends events from `npm run dev`
 ```
@@ -109,9 +110,8 @@ What each tool sends:
   `client_goal`, `preferred_protein`, `dietary_preference`, `meal_type`,
   `cooking_time`, `notes`, `generated_recipes`, `tool_source`, `campaign`
   (`lead_magnet`), `cta_destination` (`fitbudd_self_signup`), `page_url`,
-  `submitted_at`; then `pdf_download` and `cta_click` with the email. Until a
-  dedicated form exists it posts to the Hashtag Generator's form with
-  `pageName` "Recipe Generator".
+  `submitted_at`; then `pdf_download` and `cta_click` with the email. Its
+  form is `b2222d23-1400-4bec-a812-e818740c59f5`.
 
 HubSpot rejects a whole submission if it names a field the form does not
 define, so the route reads the form's public definition, sends only the
@@ -241,18 +241,41 @@ Download PDF, "Regenerate with different recipes", a disclaimer, and the CTA
   low-carb, keto and high-protein; the notes' disliked terms; the time
   limit; hype wording) and anything that fails is replaced from the
   built-in library.
-- Protein rules (`nutrition.ts`): the protein list is drawn from across the
-  set, one or two sources per recipe, never more, and legumes never land in
-  sweet or dessert-style dishes. Recipes that break this (beans in a
-  chocolate oat bowl) are dropped and replaced. Either-or ingredient lines
-  ("water or skim milk") are rejected too.
-- Honest macros (`nutrition.ts`): an ingredient-level estimator (about 80
-  reference foods, metric and US quantities, pieces, scoops, cans) recomputes
-  each recipe from its own ingredient list. Stated calories must equal
-  4 x protein + 4 x carbs + 9 x fat within 5% or they are corrected; when
-  most lines are recognised and the model's figures are more than 20% off,
-  the estimate replaces them (marked * on screen and in the PDF). The
-  library's macros are computed the same way, per serving.
+- Who does what: Gemini invents every recipe, combination and its first
+  nutrition estimate from the rules in the prompt. Our code then verifies
+  each recipe and, whenever the ingredient list is recognised, recalculates
+  the numbers from a reference table so they are checkable against the
+  ingredients. Gemini's own figures are used only when an ingredient is
+  outside the table, and those recipes are marked † (screen) / "model
+  estimate" (PDF).
+- Protein rules (`nutrition.ts`): proteins are drawn from across the set,
+  one or two sources per recipe, never more; legumes never land in sweet or
+  dessert-style dishes; no protein source the coach did not select (a splash
+  of milk is not a protein, 30 g of cheddar is); for Fat Loss, High Protein
+  and Muscle Building every main meal carries at least 25 g protein and a
+  fat-loss meal never has more grams of fat than protein. Recipes that break
+  any of this are dropped and replaced from the library.
+- Honest quantities and macros (`nutrition.ts`): meat and fish are raw
+  weights, grains and legumes cooked weights (both stated in the PDF), with a
+  separate chicken-thigh entry; solids are grams plus exact ounces (cup
+  figures for solids drift 20-40% and are never shown), liquids are
+  millilitres plus recomputed cups, tablespoons or fl oz; salt above a
+  quarter teaspoon per serving is rejected; for fat-loss or sub-500 kcal
+  meals a tablespoon of oil becomes 2 tsp before the numbers are computed;
+  spelled-out numbers in steps and notes become numerals. The reference table
+  (about 90 foods) recomputes each recipe per serving; if the list is not
+  recognised the model's figures stand with calories corrected to
+  4 x protein + 4 x carbs + 9 x fat. The library's macros are computed the
+  same way.
+- Client profile: a complete profile gives a Mifflin-St Jeor daily target
+  adjusted for activity and goal, never below 1,200 kcal (women) or 1,500
+  kcal (men); when the formula lands under the floor the tool sizes at the
+  floor and says so on screen and in the PDF. The disclaimer covers the
+  target. Only the resulting calorie targets reach the AI; the profile is
+  never stored or sent to HubSpot.
+- White-label PDF: an optional coach logo (PNG/JPG, read in the browser)
+  replaces the FitBudd logo in the header; FitBudd stays in the footer
+  credit. Placeholder business names ("abc", "test") are left off.
 - `generateRecipes.ts`: a 40-recipe library (quantities as numerals, metric
   first with the US measure in parentheses) filtered by protein, diet, meal
   type and time and ranked by goal fit and closeness to the per-meal calorie

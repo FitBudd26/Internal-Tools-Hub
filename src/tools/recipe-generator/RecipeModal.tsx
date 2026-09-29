@@ -51,6 +51,7 @@ export function RecipeModal({
       {(set.notes.length > 0 || set.dailyTarget) && (
         <p className="rounded-md bg-fb-tint px-2 py-1.5 text-[12px] leading-snug text-gray-600">
           {set.dailyTarget ? `Portions sized for about ${set.dailyTarget} kcal per day from the client profile. ` : ''}
+          {set.targetNote ? `${set.targetNote} ` : ''}
           {set.notes.join(' ')}
         </p>
       )}
@@ -74,12 +75,9 @@ export function RecipeModal({
       </button>
 
       <p className="border-t border-gray-100 pt-2 text-[11px] leading-snug text-gray-400">
-        {set.recipes.some((r) => r.nutritionSource === 'estimated') && (
-          <>
-            * Estimated from the ingredient list.
-            <br />
-          </>
-        )}
+        Nutrition is calculated from the listed ingredient quantities using reference data and is approximate.
+        {set.recipes.some((r) => r.nutritionSource !== 'estimated') && ' † Model estimate: an ingredient is outside our reference data.'}
+        <br />
         Disclaimer: {RECIPE_DISCLAIMER}
       </p>
     </ToolModal>

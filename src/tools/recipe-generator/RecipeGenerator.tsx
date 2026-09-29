@@ -4,7 +4,8 @@ import { MultiSelectDropdown } from '../../shared/components/MultiSelectDropdown
 import { SelectDropdown } from '../../shared/components/SelectDropdown';
 import { ToolMark } from '../../shared/components/ToolMark';
 import { isValidEmail } from '../../shared/lib/tracking';
-import { ACTIVITY_LEVELS, dailyCalorieTarget, inToCm, lbToKg, profileIsComplete, type ActivityLevel } from './calorieTarget';
+import { ACTIVITY_LEVELS, calorieTargetDetails, inToCm, lbToKg, profileIsComplete, targetNote, type ActivityLevel } from './calorieTarget';
+import { meaningfulBrand } from './generateRecipes';
 import { RecipeModal } from './RecipeModal';
 import { generateRecipesWithAi } from './aiRecipes';
 import { trackCtaClick, trackLead, trackPdfDownload } from './tracking';
@@ -33,9 +34,31 @@ interface ProfileForm {
   weightUnit: 'kg' | 'lb';
   activity: ActivityLevel | null;
   coachBrand: string;
+  coachLogo: { dataUrl: string; ratio: number } | null;
+  logoError: string;
 }
 
-const EMPTY_PROFILE: ProfileForm = { sex: null, age: '', height: '', heightUnit: 'cm', weight: '', weightUnit: 'kg', activity: null, coachBrand: '' };
+const EMPTY_PROFILE: ProfileForm = { sex: null, age: '', height: '', heightUnit: 'cm', weight: '', weightUnit: 'kg', activity: null, coachBrand: '', coachLogo: null, logoError: '' };
+
+const LOGO_MAX_BYTES = 1_500_000;
+
+/** Read a PNG/JPG into a data URL and measure it, entirely in the browser. */
+function readLogo(file: File): Promise<{ dataUrl: string; ratio: number }> {
+  return new Promise((resolve, reject) => {
+    if (!/^image\/(png|jpeg)$/.test(file.type)) return reject(new Error('Use a PNG or JPG file.'));
+    if (file.size > LOGO_MAX_BYTES) return reject(new Error('Keep the logo under 1.5 MB.'));
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('Could not read that file.'));
+    reader.onload = () => {
+      const dataUrl = String(reader.result);
+      const img = new Image();
+      img.onload = () => resolve({ dataUrl, ratio: img.naturalHeight / Math.max(img.naturalWidth, 1) });
+      img.onerror = () => reject(new Error('That image could not be decoded.'));
+      img.src = dataUrl;
+    };
+    reader.readAsDataURL(file);
+  });
+}
 
 function toProfile(p: ProfileForm): ClientProfile {
   const n = (v: string) => { const x = Number(v); return Number.isFinite(x) && x > 0 ? x : null; };
@@ -79,7 +102,8 @@ function toInput(f: RecipeFormState, p: ProfileForm): RecipeInput {
     cookingTime: f.cookingTime,
     notes: f.notes,
     profile: profileIsComplete(profile) ? profile : undefined,
-    coachBrand: p.coachBrand.trim() || undefined,
+    coachBrand: meaningfulBrand(p.coachBrand) || undefined,
+    coachLogo: p.coachLogo ?? undefined,
   };
 }
 
@@ -115,7 +139,10 @@ export function RecipeGenerator() {
   const [profile, setProfile] = useState<ProfileForm>(EMPTY_PROFILE);
   const setP = <K extends keyof ProfileForm>(key: K, value: ProfileForm[K]) => setProfile((p) => ({ ...p, [key]: value }));
   const clientProfile = toProfile(profile);
-  const dailyTarget = profileIsComplete(clientProfile) ? dailyCalorieTarget(clientProfile, form.goal) : null;
+  const target = profileIsComplete(clientProfile) ? calorieTargetDetails(clientProfile, form.goal) : null;
+  const dailyTarget = target?.target ?? null;
+  const floorNote = targetNote(target);
+  const brandIgnored = profile.coachBrand.trim().length > 0 && !meaningfulBrand(profile.coachBrand);
   const [touched, setTouched] = useState<Record<Field, boolean>>({ proteins: false, mealTypes: false, name: false, email: false });
   const [set, setSet] = useState<RecipeSet | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
@@ -258,7 +285,8 @@ export function RecipeGenerator() {
               Client profile and PDF branding{' '}
               <span className="font-normal text-gray-400">(optional)</span>
               <span className="mt-0.5 block text-[12px] font-normal text-gray-500">
-                Sizes portions to the client and adds your business name to the PDF. Nothing here is stored.
+                Sizes portions to the client and brands the PDF. Used only to generate this pack: not saved,
+                not sent to HubSpot, and only the resulting calorie target is shared with the AI.
               </span>
             </summary>
             <div className="mt-2 @container">
@@ -283,18 +311,55 @@ export function RecipeGenerator() {
                   </span>
                   <input type="number" inputMode="decimal" min={1} placeholder={profile.weightUnit === 'kg' ? 'e.g. 78' : 'e.g. 172'} value={profile.weight} onChange={(e) => setP('weight', e.target.value)} className={`${inputCls} h-10 ${validCls}`} />
                 </label>
-                <label className="block">
-                  <span className={labelCls}>
-                    Your business name <span className="font-normal text-gray-400">(on the PDF)</span>
-                  </span>
-                  <input type="text" placeholder="e.g. Sam Lee Coaching" value={profile.coachBrand} onChange={(e) => setP('coachBrand', e.target.value)} className={`${inputCls} h-10 ${validCls}`} />
-                </label>
+                <div>
+                  <label className="block">
+                    <span className={labelCls}>
+                      Your business name <span className="font-normal text-gray-400">(on the PDF)</span>
+                    </span>
+                    <input type="text" placeholder="e.g. Sam Lee Coaching" value={profile.coachBrand} onChange={(e) => setP('coachBrand', e.target.value)} className={`${inputCls} h-10 ${validCls}`} />
+                  </label>
+                  {brandIgnored && (
+                    <p className="mt-1 text-xs text-gray-500">Enter your real business name; placeholder text is left off the PDF.</p>
+                  )}
+                </div>
               </div>
+              <div className="mt-2.5 flex flex-wrap items-center gap-2">
+                <label className="cursor-pointer rounded-lg border border-gray-300 px-3 py-2 text-xs font-semibold text-gray-700 hover:border-fb-accent">
+                  {profile.coachLogo ? 'Change logo' : 'Upload your logo (PNG or JPG)'}
+                  <input
+                    type="file"
+                    accept="image/png,image/jpeg"
+                    className="sr-only"
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      try {
+                        setP('coachLogo', await readLogo(file));
+                        setP('logoError', '');
+                      } catch (err) {
+                        setP('coachLogo', null);
+                        setP('logoError', err instanceof Error ? err.message : 'Could not use that file.');
+                      }
+                    }}
+                  />
+                </label>
+                {profile.coachLogo && (
+                  <>
+                    <img src={profile.coachLogo.dataUrl} alt="Your logo preview" className="h-8 max-w-[120px] object-contain" />
+                    <button type="button" onClick={() => setP('coachLogo', null)} className="text-xs text-gray-500 hover:underline">
+                      Remove
+                    </button>
+                  </>
+                )}
+                <span className="text-[11px] text-gray-400">Your logo replaces FitBudd&apos;s in the PDF header.</span>
+              </div>
+              {profile.logoError && <p className="mt-1 text-xs text-red-500" role="alert">{profile.logoError}</p>}
               {dailyTarget && (
                 <p className="mt-2 text-[12px] font-medium text-fb-teal">
                   Portions will be sized for about {dailyTarget} kcal per day{form.goal ? ` (${form.goal.toLowerCase()})` : ''}. Approximate guidance only.
                 </p>
               )}
+              {floorNote && <p className="mt-1 text-[12px] leading-snug text-gray-600">{floorNote}</p>}
             </div>
           </details>
 

@@ -39,8 +39,16 @@ export async function buildRecipePdf(input: RecipeInput, set: RecipeSet): Promis
   };
   const lines = (text: string, width: number): string[] => doc.splitTextToSize(text, width) as string[];
   const header = () => {
-    const w = 30;
-    doc.addImage(FITBUDD_LOGO_PNG, 'PNG', MARGIN, 9, w, w * FITBUDD_LOGO_RATIO);
+    if (input.coachLogo) {
+      // White-label: the coach's logo takes the header; FitBudd stays in the footer credit.
+      const maxW = 44, maxH = 14;
+      let w = maxW, h = w * input.coachLogo.ratio;
+      if (h > maxH) { h = maxH; w = h / Math.max(input.coachLogo.ratio, 0.01); }
+      doc.addImage(input.coachLogo.dataUrl, input.coachLogo.dataUrl.startsWith('data:image/png') ? 'PNG' : 'JPEG', MARGIN, 8, w, h);
+    } else {
+      const w = 30;
+      doc.addImage(FITBUDD_LOGO_PNG, 'PNG', MARGIN, 9, w, w * FITBUDD_LOGO_RATIO);
+    }
     doc.setDrawColor(ORANGE[0], ORANGE[1], ORANGE[2]);
     doc.setLineWidth(0.8);
     doc.line(MARGIN, HEADER_H, PAGE_W - MARGIN, HEADER_H);
@@ -124,7 +132,7 @@ export async function buildRecipePdf(input: RecipeInput, set: RecipeSet): Promis
     ['Meal types', input.mealTypes.join(', ') || 'Any'],
     ['Cooking time', input.cookingTime ?? 'Flexible'],
   ];
-  if (set.dailyTarget) overview.push(['Portion sizing', `about ${set.dailyTarget} kcal per day (from the client profile, approximate)`]);
+  if (set.dailyTarget) overview.push(['Portion sizing', `about ${set.dailyTarget} kcal per day (from the client profile, approximate)${set.targetNote ? `. ${set.targetNote}` : ''}`]);
   const boxH = overview.reduce((h, [, v]) => h + 5.5 * lines(v, CONTENT_W - 40).length + 1, 8);
   // Set the fill right before drawing: any text drawn in between resets the fill colour.
   doc.setFillColor(TINT[0], TINT[1], TINT[2]);
@@ -151,7 +159,7 @@ export async function buildRecipePdf(input: RecipeInput, set: RecipeSet): Promis
       y += 8;
     }
     write(`${i + 1}. ${r.name}`, 15, 'bold', ORANGE, 7);
-    write(`${r.mealType}  ·  ${r.timeMinutes} min  ·  approx. ${r.nutrition.calories} kcal${r.nutritionSource === 'estimated' ? '*' : ''}, ${r.nutrition.proteinG} g protein, ${r.nutrition.carbsG} g carbs, ${r.nutrition.fatG} g fat`, 9.5, 'normal', MUTED, 5);
+    write(`${r.mealType}  ·  ${r.timeMinutes} min  ·  approx. ${r.nutrition.calories} kcal${r.nutritionSource !== 'estimated' ? ' (model estimate)' : ''}, ${r.nutrition.proteinG} g protein, ${r.nutrition.carbsG} g carbs, ${r.nutrition.fatG} g fat`, 9.5, 'normal', MUTED, 5);
     y += 1.5;
     write(r.description, 10.5, 'normal', INK, 5.2);
     y += 1;
@@ -174,7 +182,7 @@ export async function buildRecipePdf(input: RecipeInput, set: RecipeSet): Promis
   doc.setDrawColor(LINE[0], LINE[1], LINE[2]);
   doc.line(MARGIN, y, PAGE_W - MARGIN, y);
   y += 6;
-  if (recipes.some((r) => r.nutritionSource === 'estimated')) write('* Estimated from the ingredient list.', 8.5, 'normal', MUTED, 4.2);
+  write('Nutrition is calculated from the listed ingredient quantities using reference data and is approximate. Meat and fish weights are raw unless stated; grains and legumes are cooked weights unless stated dry.', 8.5, 'normal', MUTED, 4.2);
   write(`Disclaimer: ${RECIPE_DISCLAIMER}`, 8.5, 'normal', MUTED, 4.2);
 
   /* ---- footers ---- */

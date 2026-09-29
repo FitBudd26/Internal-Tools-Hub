@@ -37,12 +37,35 @@ export function profileIsComplete(p: ClientProfile): boolean {
   return Boolean(p.sex && p.age && p.heightCm && p.weightKg);
 }
 
-export function dailyCalorieTarget(p: ClientProfile, goal: ClientGoal | null): number | null {
+/** Lowest daily intake the tool will size for without supervision. */
+export const CALORIE_FLOOR = { Female: 1200, Male: 1500 } as const;
+
+export interface TargetDetails {
+  /** the target actually used (never below the floor) */
+  target: number;
+  /** what the formula gave before the floor */
+  computed: number;
+  floor: number;
+  floored: boolean;
+}
+
+export function calorieTargetDetails(p: ClientProfile, goal: ClientGoal | null): TargetDetails | null {
   if (!profileIsComplete(p)) return null;
   const bmr = 10 * (p.weightKg as number) + 6.25 * (p.heightCm as number) - 5 * (p.age as number) + (p.sex === 'Male' ? 5 : -161);
   const tdee = bmr * ACTIVITY_FACTOR[p.activity ?? 'Moderately active'];
-  const adjusted = tdee * (1 + (goal ? GOAL_ADJUST[goal] ?? 0 : 0));
-  return Math.max(1200, Math.round(adjusted / 50) * 50);
+  const computed = Math.round((tdee * (1 + (goal ? GOAL_ADJUST[goal] ?? 0 : 0))) / 50) * 50;
+  const floor = CALORIE_FLOOR[p.sex === 'Male' ? 'Male' : 'Female'];
+  return { target: Math.max(floor, computed), computed, floor, floored: computed < floor };
+}
+
+export function dailyCalorieTarget(p: ClientProfile, goal: ClientGoal | null): number | null {
+  return calorieTargetDetails(p, goal)?.target ?? null;
+}
+
+/** Plain-language note when the formula lands under the floor. */
+export function targetNote(d: TargetDetails | null): string | null {
+  if (!d || !d.floored) return null;
+  return `The formula gives about ${d.computed} kcal per day for this profile. Portions are sized at ${d.floor} kcal, the lowest we recommend without supervision from a registered dietitian or physician.`;
 }
 
 export function perMealTarget(daily: number, mealType: MealType): number {

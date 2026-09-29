@@ -80,6 +80,8 @@ export interface RecipeInput {
   profile?: ClientProfile;
   /** Coach or business name printed on the client PDF ("Prepared by"). */
   coachBrand?: string;
+  /** Coach logo (data URL + height/width ratio) for the PDF header; replaces the FitBudd header logo. */
+  coachLogo?: { dataUrl: string; ratio: number };
 }
 
 /** Approximate, per serving. Guidance for coaches, never a clinical prescription. */
@@ -111,6 +113,8 @@ export interface RecipeSet {
   notes: string[];
   /** Daily calorie target derived from the client profile, when one was given. */
   dailyTarget?: number | null;
+  /** Shown when the formula fell below the safety floor. */
+  targetNote?: string;
 }
 
 /** What the single-screen form holds (RecipeInput + the lead). */

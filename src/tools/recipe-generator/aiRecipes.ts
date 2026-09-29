@@ -1,8 +1,18 @@
 import type { MealType, Recipe, RecipeInput, RecipeSet } from './types';
 import { MEAL_TYPES } from './types';
 import { TIME_LIMIT, containsTerm, dietViolation, dislikedTerms, generateRecipes, meaningfulNotes } from './generateRecipes';
-import { dailyCalorieTarget, mealTargets } from './calorieTarget';
-import { pairingProblem, reconcileNutrition } from './nutrition';
+import { calorieTargetDetails, mealTargets, perMealTarget, targetNote } from './calorieTarget';
+import {
+  normalizeQuantities,
+  numeralize,
+  pairingProblem,
+  proteinFloorProblem,
+  proteinSources,
+  reconcileNutrition,
+  saltProblem,
+  scaleAddedFats,
+  unselectedProtein,
+} from './nutrition';
 
 /**
  * AI-first recipes with a guaranteed answer. The shared route asks Gemini
@@ -30,7 +40,8 @@ export async function generateRecipesWithAi(
   avoidNames: string[] = [],
 ): Promise<RecipeGeneration> {
   const local = generateRecipes(input, variant, COUNT, avoidNames);
-  const daily = input.profile ? dailyCalorieTarget(input.profile, input.goal) : null;
+  const details = input.profile ? calorieTargetDetails(input.profile, input.goal) : null;
+  const daily = details?.target ?? null;
   const ai = await fetchAi(input, variant, avoidNames, daily);
   if (!ai || ai.length === 0) return { set: local, source: 'local' };
 
@@ -40,24 +51,33 @@ export async function generateRecipesWithAi(
   const accepted: Recipe[] = [];
 
   for (const r of ai) {
+    const mealType = (requested.find((m) => m.toLowerCase() === r.mealType.toLowerCase()) ?? requested[0]) as MealType;
+    // Low-calorie targets (fat loss, or a small meal target) get added fats scaled down before the numbers are computed.
+    const lowCal = input.goal === 'Fat Loss' || (daily !== null && perMealTarget(daily, mealType) < 500);
+    const fats = lowCal ? scaleAddedFats(r.ingredients) : { ingredients: r.ingredients, changed: false };
     const recipe: Recipe = {
       name: clean(r.name),
-      mealType: (requested.find((m) => m.toLowerCase() === r.mealType.toLowerCase()) ?? requested[0]) as MealType,
-      goalAlignment: clean(r.goalAlignment),
-      description: clean(r.description),
-      ingredients: r.ingredients.map(clean),
-      steps: r.steps.map(clean),
+      mealType,
+      goalAlignment: numeralize(clean(r.goalAlignment)),
+      description: numeralize(clean(r.description)),
+      ingredients: fats.ingredients.map((i) => normalizeQuantities(clean(i))),
+      steps: r.steps.map((st) => numeralize(clean(st))),
       timeMinutes: r.timeMinutes,
       nutrition: r.nutrition,
-      coachingNote: clean(r.coachingNote),
+      coachingNote: numeralize(clean(r.coachingNote)),
     };
-    // Honest macros: correct calories to the macros, or replace with the ingredient estimate when far off.
+    // Numbers: calculated from the (possibly adjusted) ingredient list when it is recognised; the model's figures otherwise.
     const reconciled = reconcileNutrition(recipe.nutrition, recipe.ingredients);
     recipe.nutrition = reconciled.nutrition;
     recipe.nutritionSource = reconciled.source;
     const text = `${recipe.name} ${recipe.ingredients.join(' ')}`.toLowerCase();
+    const sources = proteinSources(recipe.name, recipe.ingredients);
+    const stray = unselectedProtein(sources, input.proteins);
     const reason =
       pairingProblem(recipe.name, recipe.ingredients) ??
+      (stray ? `introduces ${stray}, which the coach did not select` : null) ??
+      saltProblem(recipe.ingredients) ??
+      proteinFloorProblem(recipe, input.goal) ??
       (recipe.ingredients.some((i) => /\s+or\s+/i.test(i.replace(/\([^)]*\)/g, ''))) ? 'ambiguous either-or ingredient' : null) ??
       dietViolation(recipe, input.diets) ??
       (disliked.find((d) => containsTerm(text, d)) ? 'contains a disliked ingredient' : null) ??
@@ -75,7 +95,7 @@ export async function generateRecipesWithAi(
     if (accepted.length >= COUNT) break;
     if (!accepted.some((a) => a.name.toLowerCase() === r.name.toLowerCase())) accepted.push(r);
   }
-  return { set: { recipes: accepted, notes: [], dailyTarget: daily }, source: 'ai' };
+  return { set: { recipes: accepted, notes: [], dailyTarget: daily, targetNote: targetNote(details) ?? undefined }, source: 'ai' };
 }
 
 interface AiRecipe {

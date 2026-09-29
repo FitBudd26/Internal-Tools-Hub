@@ -92,9 +92,7 @@ const TOOLS: Record<string, ToolConfig> = {
   'recipe-generator': {
     pageName: 'Recipe Generator',
     formIdEnv: 'HUBSPOT_FORM_ID_RECIPE_GENERATOR',
-    // No dedicated form yet: shares the Hashtag Generator's form (email + firstname)
-    // until one is provided; pageName keeps the submissions distinguishable.
-    defaultFormId: 'e7410680-1ea2-4f36-8f94-bde4cd94aa62',
+    defaultFormId: 'b2222d23-1400-4bec-a812-e818740c59f5',
     events: {
       lead: {
         primary: true,

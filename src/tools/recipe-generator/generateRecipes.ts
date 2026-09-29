@@ -9,8 +9,8 @@ import type {
   RecipeInput,
   RecipeSet,
 } from './types';
-import { dailyCalorieTarget, perMealTarget } from './calorieTarget';
-import { estimateNutrition } from './nutrition';
+import { calorieTargetDetails, perMealTarget, targetNote } from './calorieTarget';
+import { estimateNutrition, normalizeQuantities, proteinFloorProblem } from './nutrition';
 
 /**
  * Deterministic, client-side recipe engine: a curated library of practical,
@@ -46,6 +46,8 @@ interface Template {
   note: string;
   /** Batch recipes list ingredients for this many servings. */
   servings: number;
+  /** nutrition was calculated from the ingredient list */
+  computed: boolean;
 }
 
 /** Batch recipes whose ingredient lines cover several portions. */
@@ -70,6 +72,7 @@ const T = (
   note: string,
 ): Template => {
   const servings = SERVINGS[name] ?? 1;
+  ingredients = ingredients.map(normalizeQuantities); // exact ounce / cup figures, never drifting cup guesses
   const est = estimateNutrition(ingredients);
   // Honest macros: the ingredient estimate wins over the hand-written figure whenever the list is recognised.
   const computed: Nutrition = est.coverage >= 0.7
@@ -80,13 +83,13 @@ const T = (
         fatG: Math.round(est.nutrition.fatG / servings),
       }
     : { calories: nutrition[0], proteinG: nutrition[1], carbsG: nutrition[2], fatG: nutrition[3] };
-  return { name, proteins, meals, time, tags, goals, description, ingredients, steps, nutrition: computed, note, servings };
+  return { name, proteins, meals, time, tags, goals, description, ingredients, steps, nutrition: computed, note, servings, computed: est.coverage >= 0.7 };
 };
 
 const LIBRARY: Template[] = [
   T('Lemon Herb Chicken and Rice Bowl', ['Chicken'], ['Lunch', 'Dinner', 'Meal Prep'], 25, ['glutenFree', 'dairyFree', 'highProtein'], ['Muscle Building', 'Performance', 'Maintenance'], [520, 42, 55, 12],
     'Lean chicken over rice with a bright lemon and herb dressing. Reheats well, so it doubles as a prep staple.',
-    ['150 g (5 oz) chicken breast', '185 g (1 cup) cooked rice', '90 g (1 cup) broccoli florets', '15 ml (1 tbsp) olive oil', 'Juice of half a lemon', '1 tsp dried oregano', 'Salt and pepper'],
+    ['150 g (5 oz) raw chicken breast', '185 g (1 cup) cooked rice', '90 g (1 cup) broccoli florets', '15 ml (1 tbsp) olive oil', 'Juice of half a lemon', '1 tsp dried oregano', 'Salt and pepper'],
     ['Season the chicken with oregano, salt and pepper; pan-sear 5 to 6 minutes per side until cooked through.', 'Steam or microwave the broccoli until just tender.', 'Slice the chicken, plate over the rice with the broccoli.', 'Whisk olive oil and lemon juice, drizzle over the bowl.'],
     'A dependable template: swap the grain or vegetable weekly to keep clients engaged without changing the macros much.'),
   T('10-Minute Chicken Lettuce Wraps', ['Chicken'], ['Lunch', 'Dinner', 'Snack'], 10, ['glutenFree', 'dairyFree', 'lowCarb', 'highProtein'], ['Fat Loss', 'Low Carb'], [320, 35, 10, 14],
@@ -96,7 +99,7 @@ const LIBRARY: Template[] = [
     'Great for clients who say they have no time to cook: pre-cooked chicken makes this a two-minute assembly.'),
   T('Sheet-Pan Chicken, Sweet Potato and Broccoli', ['Chicken'], ['Dinner', 'Meal Prep'], 30, ['glutenFree', 'dairyFree', 'highProtein'], ['Fat Loss', 'Healthy Eating', 'Balanced Lifestyle'], [480, 40, 42, 14],
     'One tray, one clean-up: roasted chicken thighs or breast with sweet potato and broccoli.',
-    ['150 g (5 oz) chicken breast', '1 medium sweet potato, cubed', '90 g (1 cup) broccoli florets', '10 ml (2 tsp) olive oil', '1 tsp smoked paprika', '1 tsp garlic powder', 'Salt and pepper'],
+    ['150 g (5 oz) raw chicken breast', '1 medium sweet potato, cubed', '90 g (1 cup) broccoli florets', '10 ml (2 tsp) olive oil', '1 tsp smoked paprika', '1 tsp garlic powder', 'Salt and pepper'],
     ['Heat the oven to 220 C (425 F).', 'Toss everything with oil and spices on a lined tray.', 'Roast 22 to 25 minutes, turning once, until the chicken is cooked and the potato is tender.'],
     'Scale this up on a Sunday for three or four lunches; it holds well for four days in the fridge.'),
   T('Mediterranean Chicken Salad', ['Chicken'], ['Lunch'], 15, ['glutenFree', 'mediterranean', 'highProtein', 'lowCarb'], ['Fat Loss', 'Healthy Eating', 'Low Carb'], [380, 36, 14, 20],
@@ -116,12 +119,12 @@ const LIBRARY: Template[] = [
     'Show clients the layering order once and they can repeat it with any protein and salad base.'),
   T('Turkey and Veggie Skillet', ['Turkey'], ['Dinner', 'Meal Prep', 'Lunch'], 20, ['glutenFree', 'dairyFree', 'lowCarb', 'highProtein'], ['Fat Loss', 'High Protein'], [380, 38, 14, 18],
     'Lean ground turkey with peppers, courgette and spinach in one pan. Big volume, moderate calories.',
-    ['150 g (5 oz) lean ground turkey', '1 red pepper, diced', '1 small courgette, diced', '60 g (2 handfuls) spinach', '5 ml (1 tsp) olive oil', '1 tsp cumin', '1 tsp chili flakes', 'Salt and pepper'],
+    ['150 g (5 oz) raw lean ground turkey', '1 red pepper, diced', '1 small courgette, diced', '60 g (2 handfuls) spinach', '5 ml (1 tsp) olive oil', '1 tsp cumin', '1 tsp chili flakes', 'Salt and pepper'],
     ['Brown the turkey in oil with the spices, breaking it up.', 'Add pepper and courgette; cook 6 to 8 minutes.', 'Stir in the spinach until wilted and season.'],
     'Volume eating made simple: clients in a deficit stay full without tracking every gram.'),
   T('Egg and Turkey Breakfast Skillet', ['Eggs', 'Turkey'], ['Breakfast', 'Post-Workout'], 15, ['glutenFree', 'dairyFree', 'lowCarb', 'keto', 'highProtein'], ['Low Carb', 'Fat Loss', 'High Protein'], [360, 34, 8, 22],
     'Turkey mince, peppers and two eggs cooked in the same pan. A savoury, protein-first start to the day.',
-    ['100 g (3.5 oz) lean ground turkey', '2 eggs', '½ red pepper, diced', '30 g (a handful) spinach', '5 ml (1 tsp) olive oil', 'Smoked paprika, salt and pepper'],
+    ['100 g (3.5 oz) raw lean ground turkey', '2 eggs', '½ red pepper, diced', '30 g (a handful) spinach', '5 ml (1 tsp) olive oil', 'Smoked paprika, salt and pepper'],
     ['Brown the turkey with paprika; add the pepper for 3 minutes.', 'Stir in the spinach, then make two wells and crack in the eggs.', 'Cover and cook 3 to 4 minutes until the whites set.'],
     'For clients who skip breakfast and overeat later, a savoury protein breakfast is often the fix.'),
   T('Turkey Egg-White Breakfast Wrap', ['Turkey', 'Eggs'], ['Breakfast', 'Pre-Workout'], 10, ['highProtein'], ['Muscle Building', 'Performance'], [390, 34, 36, 10],
@@ -131,27 +134,27 @@ const LIBRARY: Template[] = [
     'Sits well 60 to 90 minutes before a session: protein plus easy carbs, low fat.'),
   T('Lean Beef and Quinoa Power Bowl', ['Beef'], ['Lunch', 'Dinner', 'Post-Workout', 'Meal Prep'], 25, ['glutenFree', 'dairyFree', 'highProtein'], ['Muscle Building', 'Performance'], [560, 40, 50, 18],
     'Seared lean beef strips over quinoa with roasted vegetables. A complete training-day plate.',
-    ['150 g (5 oz) lean beef strips', '185 g (1 cup) cooked quinoa', '120 g (1 cup) roasted mixed vegetables', '5 ml (1 tsp) olive oil', '1 tsp garlic powder', 'Salt and pepper', '20 g (a handful) rocket'],
+    ['150 g (5 oz) raw lean beef strips', '185 g (1 cup) cooked quinoa', '120 g (1 cup) roasted mixed vegetables', '5 ml (1 tsp) olive oil', '1 tsp garlic powder', 'Salt and pepper', '20 g (a handful) rocket'],
     ['Season and sear the beef 2 to 3 minutes per side; rest.', 'Warm the quinoa and vegetables.', 'Slice the beef, build the bowl and top with rocket.'],
     'Ideal post-training meal for clients chasing strength or size; the quinoa adds a little extra protein.'),
   T('Steak and Roasted Vegetable Plate', ['Beef'], ['Dinner'], 25, ['glutenFree', 'dairyFree', 'lowCarb', 'keto', 'highProtein'], ['Low Carb', 'Maintenance'], [450, 38, 12, 26],
     'A simple sirloin with roasted peppers, courgette and mushrooms. Satisfying without the starch.',
-    ['150 g (5 oz) sirloin steak', '150 g (1 cup) mixed peppers and courgette', '4 mushrooms, halved', '15 ml (1 tbsp) olive oil', 'Rosemary, salt and pepper'],
+    ['150 g (5 oz) raw sirloin steak', '150 g (1 cup) mixed peppers and courgette', '4 mushrooms, halved', '15 ml (1 tbsp) olive oil', 'Rosemary, salt and pepper'],
     ['Roast the vegetables with half the oil at 220 C (425 F) for 15 minutes.', 'Sear the steak 3 to 4 minutes per side; rest 5 minutes.', 'Slice and serve with the vegetables.'],
     'Low-carb clients often miss "proper dinners"; this feels like one and keeps carbs minimal.'),
   T('Beef and Bean Chili (Meal Prep)', ['Beef', 'Beans'], ['Meal Prep', 'Dinner'], 30, ['glutenFree', 'dairyFree', 'highProtein'], ['Muscle Building', 'Balanced Lifestyle', 'Maintenance'], [520, 40, 40, 20],
     'Lean beef and kidney beans in a smoky tomato base. Makes four portions that freeze well.',
-    ['500 g (1.1 lb) lean ground beef', '240 g (1 can, drained) kidney beans', '400 g (1 can) chopped tomatoes', '1 onion, diced', '1 tbsp chili powder', '1 tsp cumin', '5 ml (1 tsp) olive oil'],
+    ['500 g (1.1 lb) raw lean ground beef', '240 g (1 can, drained) kidney beans', '400 g (1 can) chopped tomatoes', '1 onion, diced', '1 tbsp chili powder', '1 tsp cumin', '5 ml (1 tsp) olive oil'],
     ['Soften the onion in oil, add the beef and brown.', 'Stir in spices, tomatoes and beans; simmer 20 minutes.', 'Portion into four containers.'],
     'A batch-cook anchor: pair it with rice on training days and salad on rest days.'),
   T('Keto Beef and Cheese Stuffed Peppers', ['Beef', 'Dairy'], ['Dinner', 'Meal Prep'], 30, ['glutenFree', 'lowCarb', 'keto', 'highProtein'], ['Low Carb', 'High Protein'], [480, 36, 12, 32],
     'Peppers stuffed with seasoned beef and melted cheese. Rich, low in carbs and easy to reheat.',
-    ['150 g (5 oz) lean ground beef', '1 large bell pepper, halved', '40 g (1.5 oz) grated cheddar', '½ onion, diced', '1 tsp Italian seasoning', 'Salt and pepper'],
+    ['150 g (5 oz) raw lean ground beef', '1 large bell pepper, halved', '40 g (1.5 oz) grated cheddar', '½ onion, diced', '1 tsp Italian seasoning', 'Salt and pepper'],
     ['Brown the beef with onion and seasoning.', 'Fill the pepper halves, top with cheese.', 'Bake at 200 C (400 F) for 18 to 20 minutes.'],
     'Keep an eye on total fat for fat-loss clients; halve the cheese if calories need to come down.'),
   T('Garlic Salmon with Greens', ['Fish'], ['Dinner', 'Lunch'], 20, ['glutenFree', 'dairyFree', 'lowCarb', 'keto', 'mediterranean', 'highProtein'], ['Fat Loss', 'Healthy Eating', 'Low Carb'], [430, 34, 8, 28],
     'Pan-seared salmon with garlic sauteed spinach and green beans. Omega-3s and protein in one plate.',
-    ['150 g (5 oz) salmon fillet', '60 g (2 handfuls) spinach', '100 g (1 cup) green beans', '1 clove garlic, sliced', '15 ml (1 tbsp) olive oil', 'Lemon, salt and pepper'],
+    ['150 g (5 oz) raw salmon fillet', '60 g (2 handfuls) spinach', '100 g (1 cup) green beans', '1 clove garlic, sliced', '15 ml (1 tbsp) olive oil', 'Lemon, salt and pepper'],
     ['Sear the salmon skin-side down 4 minutes, flip for 3 more.', 'Saute garlic in oil, add beans then spinach until wilted.', 'Plate with lemon.'],
     'Twice-a-week oily fish is an easy, evidence-friendly habit to give clients.'),
   T('Tuna and White Bean Salad', ['Fish', 'Beans'], ['Lunch', 'Snack', 'Meal Prep'], 10, ['glutenFree', 'dairyFree', 'mediterranean', 'highProtein'], ['Fat Loss', 'Healthy Eating', 'Balanced Lifestyle'], [360, 32, 30, 10],
@@ -161,7 +164,7 @@ const LIBRARY: Template[] = [
     'Cupboard-only ingredients make this the fallback meal for clients who forgot to shop.'),
   T('Baked Cod with Herbed Potatoes', ['Fish'], ['Dinner'], 30, ['glutenFree', 'dairyFree', 'mediterranean'], ['Performance', 'Maintenance', 'Healthy Eating'], [420, 34, 40, 10],
     'Flaky white fish over baby potatoes with herbs and lemon. Light, high in protein and easy to digest.',
-    ['150 g (5 oz) cod fillet', '200 g (7 oz) baby potatoes, halved', '15 ml (1 tbsp) olive oil', '1 tsp dried thyme', 'Lemon, salt and pepper', 'Side of steamed greens'],
+    ['150 g (5 oz) raw cod fillet', '200 g (7 oz) baby potatoes, halved', '15 ml (1 tbsp) olive oil', '1 tsp dried thyme', 'Lemon, salt and pepper', 'Side of steamed greens'],
     ['Roast the potatoes with oil and thyme at 210 C (410 F) for 20 minutes.', 'Add the cod to the tray, season, bake 10 more minutes.', 'Serve with lemon and greens.'],
     'A good evening meal before a morning session: carbs without heaviness.'),
   T('Salmon Poke-Style Bowl', ['Fish'], ['Lunch', 'Dinner', 'Post-Workout'], 15, ['dairyFree', 'glutenFree', 'mediterranean', 'highProtein'], ['Performance', 'Muscle Building'], [520, 34, 56, 16],
@@ -379,18 +382,23 @@ function goalAlignment(goal: ClientGoal, n: Nutrition): string {
   }
 }
 
-function goalScore(goal: ClientGoal, t: Template): number {
+/** Goal fit; calorie thresholds follow the per-meal target when a client profile gives one. */
+function goalScore(goal: ClientGoal, t: Template, target: number | null): number {
   const n = t.nutrition;
   let s = t.goals.includes(goal) ? 3 : 0;
+  const cap = target ? target * 1.05 : 450;
+  const high = target ? target * 1.25 : 520;
   switch (goal) {
-    case 'Fat Loss': s += n.calories <= 450 && n.proteinG >= 24 ? 2 : n.calories > 520 ? -2 : 0; break;
+    case 'Fat Loss': s += n.calories <= cap && n.proteinG >= 24 ? 2 : n.calories > high ? -2 : 0; break;
     case 'Muscle Building': s += n.proteinG >= 30 && n.carbsG >= 30 ? 2 : 0; break;
     case 'High Protein': s += n.proteinG >= 30 ? 3 : n.proteinG >= 24 ? 1 : -2; break;
     case 'Low Carb': s += n.carbsG <= 15 ? 3 : n.carbsG > 35 ? -4 : 0; break;
     case 'Performance': s += n.carbsG >= 35 ? 2 : 0; break;
     case 'Healthy Eating': s += t.tags.includes('mediterranean') ? 1 : 0; break;
     case 'Maintenance':
-    case 'Balanced Lifestyle': s += n.calories >= 320 && n.calories <= 560 ? 1 : 0; break;
+    case 'Balanced Lifestyle':
+      s += (target ? n.calories >= target * 0.7 && n.calories <= target * 1.2 : n.calories >= 320 && n.calories <= 560) ? 1 : 0;
+      break;
   }
   return s;
 }
@@ -405,7 +413,7 @@ function build(t: Template, goal: ClientGoal, mealType: MealType): Recipe {
     steps: t.steps,
     timeMinutes: t.time,
     nutrition: t.nutrition,
-    nutritionSource: 'stated',
+    nutritionSource: t.computed ? 'estimated' : 'stated',
     coachingNote: `${t.note} ${GOAL_NOTE[goal]}${batch}`,
     mealType,
   };
@@ -415,6 +423,17 @@ function build(t: Template, goal: ClientGoal, mealType: MealType): Recipe {
 export function meaningfulNotes(notes: string): string {
   const s = notes.trim();
   return s.length >= 4 && /\b[a-z]{3,}\b/i.test(s) && /[aeiou]/i.test(s) ? s : '';
+}
+
+const PLACEHOLDERS = /^(abc|abcd|test|testing|xyz|asdf|qwerty|none|n\/a|na|name|sample|demo|example|business|company|coach|brand)$/i;
+
+/** A business name worth printing on a client PDF; placeholders like "abc" or "test" are dropped. */
+export function meaningfulBrand(brand: string): string {
+  const s = brand.trim().replace(/\s+/g, ' ');
+  if (s.length < 3 || s.length > 60) return '';
+  if (!/[aeiou]/i.test(s) || !/[a-z]{3,}/i.test(s)) return '';
+  if (PLACEHOLDERS.test(s) || /^(.)\1+$/.test(s)) return '';
+  return s;
 }
 
 export function generateRecipes(input: RecipeInput, variant = 0, count = 3, avoidNames: string[] = []): RecipeSet {
@@ -427,7 +446,8 @@ export function generateRecipes(input: RecipeInput, variant = 0, count = 3, avoi
   const wantedMeals = input.mealTypes.length ? input.mealTypes : [...new Set(LIBRARY.flatMap((t) => t.meals))];
   const disliked = dislikedTerms(meaningfulNotes(input.notes));
   const notes: string[] = [];
-  const daily = input.profile ? dailyCalorieTarget(input.profile, goal) : null;
+  const details = input.profile ? calorieTargetDetails(input.profile, goal) : null;
+  const daily = details?.target ?? null;
 
   const dietOk = (t: Template) => requiredTags.every((tag) => t.tags.includes(tag));
   const proteinOk = (t: Template) => anyProtein || t.proteins.some((p) => input.proteins.includes(p));
@@ -455,18 +475,24 @@ export function generateRecipes(input: RecipeInput, variant = 0, count = 3, avoi
   }
 
   const rng = mulberry32(seed ^ (variant * 0x9e3779b9));
+  const mealOf = (t: Template) => t.meals.find((m) => wantedMeals.includes(m)) ?? t.meals[0];
+  const mealTarget = (t: Template) => (daily ? perMealTarget(daily, mealOf(t)) : null);
   const targetPenalty = (t: Template) => {
-    if (!daily) return 0;
-    const meal = t.meals.find((m) => wantedMeals.includes(m)) ?? t.meals[0];
-    const target = perMealTarget(daily, meal);
+    const target = mealTarget(t);
+    if (!target) return 0;
     return -Math.min(8, (Math.abs(t.nutrition.calories - target) / target) * 12); // strong enough to outweigh goal bonuses when far off
+  };
+  const floorPenalty = (t: Template) => {
+    const meal = t.meals.find((m) => wantedMeals.includes(m)) ?? t.meals[0];
+    return proteinFloorProblem({ mealType: meal, nutrition: t.nutrition }, goal) ? -6 : 0;
   };
   const scored = candidates
     .map((t) => ({
       t,
       score:
-        goalScore(goal, t) +
+        goalScore(goal, t, mealTarget(t)) +
         targetPenalty(t) +
+        floorPenalty(t) +
         (proteinOk(t) && !anyProtein ? 2 : 0) +
         (t.time <= limit ? 1 : 0) +
         (t.meals.some((m) => wantedMeals.includes(m)) ? 1 : 0) +
@@ -494,7 +520,7 @@ export function generateRecipes(input: RecipeInput, variant = 0, count = 3, avoi
   }
 
   const recipes = picked.map((t) => build(t, goal, t.meals.find((m) => wantedMeals.includes(m)) ?? t.meals[0]));
-  return { recipes, notes: [...new Set(notes)], dailyTarget: daily };
+  return { recipes, notes: [...new Set(notes)], dailyTarget: daily, targetNote: targetNote(details) ?? undefined };
 }
 
 function mulberry32(seed: number): () => number {
