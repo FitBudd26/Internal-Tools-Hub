@@ -50,11 +50,23 @@ function readLogo(file: File): Promise<{ dataUrl: string; ratio: number }> {
     const reader = new FileReader();
     reader.onerror = () => reject(new Error('Could not read that file.'));
     reader.onload = () => {
-      const dataUrl = String(reader.result);
       const img = new Image();
-      img.onload = () => resolve({ dataUrl, ratio: img.naturalHeight / Math.max(img.naturalWidth, 1) });
+      img.onload = () => {
+        // Downscale and flatten onto white so the PDF stays small (jsPDF embeds
+        // large PNGs uncompressed); 600 px wide is plenty for a 44 mm header logo.
+        const scale = Math.min(1, 600 / Math.max(img.naturalWidth, 1));
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.max(1, Math.round(img.naturalWidth * scale));
+        canvas.height = Math.max(1, Math.round(img.naturalHeight * scale));
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return reject(new Error('Could not process that image.'));
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve({ dataUrl: canvas.toDataURL('image/jpeg', 0.9), ratio: canvas.height / canvas.width });
+      };
       img.onerror = () => reject(new Error('That image could not be decoded.'));
-      img.src = dataUrl;
+      img.src = String(reader.result);
     };
     reader.readAsDataURL(file);
   });
