@@ -4,6 +4,7 @@ import { MultiSelectDropdown } from '../../shared/components/MultiSelectDropdown
 import { SelectDropdown } from '../../shared/components/SelectDropdown';
 import { ToolMark } from '../../shared/components/ToolMark';
 import { isValidEmail } from '../../shared/lib/tracking';
+import { ACTIVITY_LEVELS, dailyCalorieTarget, inToCm, lbToKg, profileIsComplete, type ActivityLevel } from './calorieTarget';
 import { RecipeModal } from './RecipeModal';
 import { generateRecipesWithAi } from './aiRecipes';
 import { trackCtaClick, trackLead, trackPdfDownload } from './tracking';
@@ -13,11 +14,40 @@ import {
   DIETS,
   MEAL_TYPES,
   PROTEINS,
+  type ClientProfile,
   type CookingTime,
   type RecipeFormState,
   type RecipeInput,
   type RecipeSet,
 } from './types';
+
+const SEXES = ['Female', 'Male'] as const;
+
+/** Optional client profile as typed (units kept until submit) plus PDF branding. */
+interface ProfileForm {
+  sex: 'Female' | 'Male' | null;
+  age: string;
+  height: string;
+  heightUnit: 'cm' | 'in';
+  weight: string;
+  weightUnit: 'kg' | 'lb';
+  activity: ActivityLevel | null;
+  coachBrand: string;
+}
+
+const EMPTY_PROFILE: ProfileForm = { sex: null, age: '', height: '', heightUnit: 'cm', weight: '', weightUnit: 'kg', activity: null, coachBrand: '' };
+
+function toProfile(p: ProfileForm): ClientProfile {
+  const n = (v: string) => { const x = Number(v); return Number.isFinite(x) && x > 0 ? x : null; };
+  const h = n(p.height), w = n(p.weight);
+  return {
+    sex: p.sex,
+    age: n(p.age),
+    heightCm: h === null ? null : p.heightUnit === 'in' ? inToCm(h) : Math.round(h),
+    weightKg: w === null ? null : p.weightUnit === 'lb' ? lbToKg(w) : w,
+    activity: p.activity,
+  };
+}
 
 const inputCls =
   'w-full rounded-lg border bg-white px-3 text-sm text-gray-900 outline-none transition-colors placeholder:text-gray-400 focus:ring-2';
@@ -39,8 +69,36 @@ const EMPTY: RecipeFormState = {
   email: '',
 };
 
-function toInput(f: RecipeFormState): RecipeInput {
-  return { goal: f.goal, proteins: f.proteins, diets: f.diets, mealTypes: f.mealTypes, cookingTime: f.cookingTime, notes: f.notes };
+function toInput(f: RecipeFormState, p: ProfileForm): RecipeInput {
+  const profile = toProfile(p);
+  return {
+    goal: f.goal,
+    proteins: f.proteins,
+    diets: f.diets,
+    mealTypes: f.mealTypes,
+    cookingTime: f.cookingTime,
+    notes: f.notes,
+    profile: profileIsComplete(profile) ? profile : undefined,
+    coachBrand: p.coachBrand.trim() || undefined,
+  };
+}
+
+function UnitToggle<T extends string>({ value, options, onChange }: { value: T; options: readonly T[]; onChange: (v: T) => void }) {
+  return (
+    <span className="ml-1.5 inline-flex overflow-hidden rounded border border-gray-300 text-[11px] font-medium">
+      {options.map((o) => (
+        <button
+          key={o}
+          type="button"
+          aria-pressed={o === value}
+          onClick={() => onChange(o)}
+          className={`px-1.5 py-0.5 ${o === value ? 'bg-fb-orange text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
+        >
+          {o}
+        </button>
+      ))}
+    </span>
+  );
 }
 
 function RequiredMark() {
@@ -54,6 +112,10 @@ function RequiredMark() {
 
 export function RecipeGenerator() {
   const [form, setForm] = useState<RecipeFormState>(EMPTY);
+  const [profile, setProfile] = useState<ProfileForm>(EMPTY_PROFILE);
+  const setP = <K extends keyof ProfileForm>(key: K, value: ProfileForm[K]) => setProfile((p) => ({ ...p, [key]: value }));
+  const clientProfile = toProfile(profile);
+  const dailyTarget = profileIsComplete(clientProfile) ? dailyCalorieTarget(clientProfile, form.goal) : null;
   const [touched, setTouched] = useState<Record<Field, boolean>>({ proteins: false, mealTypes: false, name: false, email: false });
   const [set, setSet] = useState<RecipeSet | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
@@ -76,7 +138,7 @@ export function RecipeGenerator() {
     if (!isValid || pending !== 'idle') return;
     setPending('generate');
     try {
-      const input = toInput(form);
+      const input = toInput(form, profile);
       // Gemini via /api/generate when configured; the built-in library otherwise.
       const { set: generated } = await generateRecipesWithAi(input, 0);
       setSet(generated);
@@ -94,7 +156,7 @@ export function RecipeGenerator() {
     const next = variant + 1;
     setPending('regenerate');
     try {
-      const { set: generated } = await generateRecipesWithAi(toInput(form), next, set.recipes.map((r) => r.name));
+      const { set: generated } = await generateRecipesWithAi(toInput(form, profile), next, set.recipes.map((r) => r.name));
       setVariant(next);
       setSet(generated);
     } finally {
@@ -190,6 +252,52 @@ export function RecipeGenerator() {
             }}
           />
 
+          {/* Optional: anonymous client stats size the portions; the name brands the PDF. Collapsed to keep the form short. */}
+          <details className="rounded-lg border border-gray-200 bg-white px-3 py-2 open:pb-3">
+            <summary className="cursor-pointer text-sm font-bold text-gray-900">
+              Client profile and PDF branding{' '}
+              <span className="font-normal text-gray-400">(optional)</span>
+              <span className="mt-0.5 block text-[12px] font-normal text-gray-500">
+                Sizes portions to the client and adds your business name to the PDF. Nothing here is stored.
+              </span>
+            </summary>
+            <div className="mt-2 @container">
+              <div className="grid grid-cols-1 items-end gap-2.5 @sm:grid-cols-2">
+                <SelectDropdown label="Sex" placeholder="Select" options={SEXES} selected={profile.sex} onChange={(v) => setP('sex', v)} />
+                <SelectDropdown label="Activity level" placeholder="Select" options={ACTIVITY_LEVELS} selected={profile.activity} onChange={(v) => setP('activity', v)} />
+                <label className="block">
+                  <span className={labelCls}>Age</span>
+                  <input type="number" inputMode="numeric" min={14} max={100} placeholder="e.g. 34" value={profile.age} onChange={(e) => setP('age', e.target.value)} className={`${inputCls} h-10 ${validCls}`} />
+                </label>
+                <label className="block">
+                  <span className={`${labelCls} flex items-center`}>
+                    Height
+                    <UnitToggle value={profile.heightUnit} options={['cm', 'in'] as const} onChange={(v) => setP('heightUnit', v)} />
+                  </span>
+                  <input type="number" inputMode="decimal" min={1} placeholder={profile.heightUnit === 'cm' ? 'e.g. 172' : 'e.g. 68'} value={profile.height} onChange={(e) => setP('height', e.target.value)} className={`${inputCls} h-10 ${validCls}`} />
+                </label>
+                <label className="block">
+                  <span className={`${labelCls} flex items-center`}>
+                    Weight
+                    <UnitToggle value={profile.weightUnit} options={['kg', 'lb'] as const} onChange={(v) => setP('weightUnit', v)} />
+                  </span>
+                  <input type="number" inputMode="decimal" min={1} placeholder={profile.weightUnit === 'kg' ? 'e.g. 78' : 'e.g. 172'} value={profile.weight} onChange={(e) => setP('weight', e.target.value)} className={`${inputCls} h-10 ${validCls}`} />
+                </label>
+                <label className="block">
+                  <span className={labelCls}>
+                    Your business name <span className="font-normal text-gray-400">(on the PDF)</span>
+                  </span>
+                  <input type="text" placeholder="e.g. Sam Lee Coaching" value={profile.coachBrand} onChange={(e) => setP('coachBrand', e.target.value)} className={`${inputCls} h-10 ${validCls}`} />
+                </label>
+              </div>
+              {dailyTarget && (
+                <p className="mt-2 text-[12px] font-medium text-fb-teal">
+                  Portions will be sized for about {dailyTarget} kcal per day{form.goal ? ` (${form.goal.toLowerCase()})` : ''}. Approximate guidance only.
+                </p>
+              )}
+            </div>
+          </details>
+
           <label className="block">
             <span className={labelCls}>
               Notes / Preferences <span className="font-normal text-gray-400">(optional)</span>
@@ -277,7 +385,7 @@ export function RecipeGenerator() {
 
       <RecipeModal
         open={modalOpen}
-        input={toInput(form)}
+        input={toInput(form, profile)}
         set={set}
         regenerating={pending === 'regenerate'}
         onClose={() => setModalOpen(false)}

@@ -322,10 +322,17 @@ const recipes: ToolSpec = {
       count: num(o.count, 1, 5) ?? 3,
       variant: num(o.variant, 0, 99) ?? 0,
       avoidNames: strings(o.avoidNames, 15, 80),
+      dailyTarget: num(o.dailyTarget, 1000, 5000),
+      mealTargets: Array.isArray(o.mealTargets)
+        ? o.mealTargets
+            .map((m) => ({ mealType: str((m as { mealType?: unknown })?.mealType, 30), kcal: num((m as { kcal?: unknown })?.kcal, 100, 1500) }))
+            .filter((m): m is { mealType: string; kcal: number } => Boolean(m.mealType && m.kcal))
+            .slice(0, 7)
+        : [],
     };
   },
   prompt(input) {
-    const i = input as { goal: string; proteins: string[]; diets: string[]; mealTypes: string[]; cookingTime: string; notes: string; count: number; variant: number; avoidNames: string[] };
+    const i = input as { goal: string; proteins: string[]; diets: string[]; mealTypes: string[]; cookingTime: string; notes: string; count: number; variant: number; avoidNames: string[]; dailyTarget: number | null; mealTargets: { mealType: string; kcal: number }[] };
     const diets = i.diets.filter((d) => d !== 'No Restrictions');
     const proteins = i.proteins.filter((p) => p !== 'No Preference');
     const limit = /under (\d+)/i.exec(i.cookingTime)?.[1];
@@ -336,15 +343,19 @@ const recipes: ToolSpec = {
       `Preferred proteins: ${proteins.length ? proteins.join(', ') : 'no preference'}`,
       `Dietary requirements (HARD constraints; every recipe must satisfy ALL of them): ${diets.length ? diets.join(', ') : 'none'}`,
       `Meal types requested: ${i.mealTypes.join(', ')}`,
-      `Cooking time: ${limit ? `total time must be under ${limit} minutes` : 'flexible'}`,
+      `Cooking time: ${limit ? `total time must be under ${limit} minutes` : 'flexible: no limit, and include at least one recipe of 30-45 minutes where slower or batch cooking improves the result'}`,
+      ...(i.mealTargets.length ? [`Calorie targets per serving for this client (stay within 15%): ${i.mealTargets.map((m) => `${m.mealType} about ${m.kcal} kcal`).join(', ')}${i.dailyTarget ? ` (about ${i.dailyTarget} kcal per day)` : ''}.`] : []),
       `Coach's notes about the client (treat any dislikes, allergies or intolerances as HARD exclusions): ${i.notes ? `"""${i.notes}"""` : 'none'}`,
       `Variation seed: ${i.variant} (this set must feel different from other sets for the same inputs).`,
       '',
       `Return exactly ${i.count} recipes:`,
       '- Distinct from each other: different main ingredient or cooking method, never two variations of the same dish.',
       '- Cover each requested meal type at least once where possible; set mealType to one of the requested values exactly.',
+      '- Protein sources: draw from the preferred list ACROSS the set, not in every recipe. Each recipe uses one or at most two protein sources, and only pairs that belong in the same dish (chicken with lentils works; beans in a chocolate oat bowl does not). Legumes (beans, lentils, chickpeas) never go into sweet or dessert-style dishes such as smoothies, shakes, oat bowls, pancakes, parfaits or puddings.',
       '- Use the preferred proteins where they comply with the dietary requirements; if a preferred protein conflicts with a requirement (for example chicken with Vegan), skip that protein.',
-      '- Each recipe: a specific name, 5-9 ingredients with quantities for one serving, 3-6 short numbered steps, timeMinutes within the limit, approximate per-serving nutrition as whole numbers (calories, proteinG, carbsG, fatG; round figures, no false precision), goalAlignment (one sentence tying the ingredients or macros to the client goal), and coachingNote (one or two sentences on how a trainer uses this with clients).',
+      '- Each recipe: a specific name, 5-9 ingredients with quantities for one serving, 3-6 short numbered steps, timeMinutes within the limit, goalAlignment (one sentence tying the ingredients or macros to the client goal), and coachingNote (one or two sentences on how a trainer uses this with clients).',
+      '- Quantities: numerals only, metric first with the US measure in parentheses, e.g. "150 g (5 oz) chicken breast", "120 ml (1/2 cup) skimmed milk", "40 g (1/2 cup) rolled oats", "2 eggs", "1 tbsp olive oil". Never offer alternatives inside an ingredient line ("water or milk"); pick one and mention swaps in the coachingNote. Seasonings (salt, pepper, dried herbs, spices) go on one line. Avoid fractional cans or packs; if unavoidable, say in the coachingNote how to use the rest.',
+      '- Nutrition per serving as whole numbers (calories, proteinG, carbsG, fatG): estimate from the actual quantities and count every ingredient (legumes, nut butters, oils, dairy, grains). Calories must equal 4 x protein + 4 x carbs + 9 x fat within 5%. Round figures, no false precision.',
       '- Everyday supermarket ingredients, simple technique, nothing exotic or complex.',
       ...(i.avoidNames.length ? [`- Do not return these recipes or close variations of them: ${i.avoidNames.join(', ')}.`] : []),
       ...STYLE_RULES.map((r) => `- ${r}`),

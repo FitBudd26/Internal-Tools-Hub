@@ -48,8 +48,9 @@ export function RecipeModal({
         />
       }
     >
-      {set.notes.length > 0 && (
+      {(set.notes.length > 0 || set.dailyTarget) && (
         <p className="rounded-md bg-fb-tint px-2 py-1.5 text-[12px] leading-snug text-gray-600">
+          {set.dailyTarget ? `Portions sized for about ${set.dailyTarget} kcal per day from the client profile. ` : ''}
           {set.notes.join(' ')}
         </p>
       )}
@@ -58,7 +59,7 @@ export function RecipeModal({
       ))}
 
       <PdfDownloadButton
-        onDownload={() => downloadRecipePdf(input, set.recipes)}
+        onDownload={() => downloadRecipePdf(input, set)}
         onDownloaded={onPdfDownloaded}
         ariaLabel="Download these recipes as a branded PDF"
       />
@@ -73,6 +74,12 @@ export function RecipeModal({
       </button>
 
       <p className="border-t border-gray-100 pt-2 text-[11px] leading-snug text-gray-400">
+        {set.recipes.some((r) => r.nutritionSource === 'estimated') && (
+          <>
+            * Estimated from the ingredient list.
+            <br />
+          </>
+        )}
         Disclaimer: {RECIPE_DISCLAIMER}
       </p>
     </ToolModal>

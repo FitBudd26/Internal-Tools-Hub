@@ -1,5 +1,5 @@
 import type { jsPDF } from 'jspdf';
-import type { Recipe, RecipeInput } from './types';
+import type { Recipe, RecipeInput, RecipeSet } from './types';
 import { RECIPE_DISCLAIMER } from '../../shared/disclaimers';
 
 /**
@@ -9,8 +9,7 @@ import { RECIPE_DISCLAIMER } from '../../shared/disclaimers';
 
 type RGB = [number, number, number];
 const ORANGE: RGB = [255, 122, 0];
-const TEAL: RGB = [0, 147, 121];
-const INK: RGB = [17, 24, 39];
+const INK: RGB = [13, 13, 13];
 const MUTED: RGB = [107, 114, 128];
 const LINE: RGB = [229, 231, 235];
 const TINT: RGB = [240, 250, 248];
@@ -24,7 +23,8 @@ const FOOTER_Y = PAGE_H - 11;
 
 export const RECIPE_PDF_FILE = 'fitbudd-recipe-generator.pdf';
 
-export async function buildRecipePdf(input: RecipeInput, recipes: Recipe[]): Promise<jsPDF> {
+export async function buildRecipePdf(input: RecipeInput, set: RecipeSet): Promise<jsPDF> {
+  const recipes = set.recipes;
   const [{ jsPDF }, { FITBUDD_LOGO_PNG, FITBUDD_LOGO_RATIO }] = await Promise.all([
     import('jspdf'),
     import('../../shared/logo'),
@@ -83,10 +83,24 @@ export async function buildRecipePdf(input: RecipeInput, recipes: Recipe[]): Pro
   };
   const label = (text: string) => {
     ensure(7);
-    setStyle(9, 'bold', TEAL);
+    setStyle(9, 'bold', INK);
     doc.text(text.toUpperCase(), MARGIN, y);
     y += 5;
   };
+  /** Height a recipe card will need, so a recipe never splits across pages when it can fit on one. */
+  const measureRecipe = (r: Recipe): number => {
+    const meta = `${r.mealType}  ·  ${r.timeMinutes} min  ·  approx. ${r.nutrition.calories} kcal, ${r.nutrition.proteinG} g protein, ${r.nutrition.carbsG} g carbs, ${r.nutrition.fatG} g fat`;
+    setStyle(15, 'bold', ORANGE); let h = 7 * lines(r.name, CONTENT_W).length;
+    setStyle(9.5, 'normal', MUTED); h += 5 * lines(meta, CONTENT_W).length + 1.5;
+    setStyle(10.5, 'normal', INK); h += 5.2 * lines(r.description, CONTENT_W).length + 1;
+    setStyle(10, 'normal', INK);
+    h += 7 + 5 * lines(r.goalAlignment, CONTENT_W).length + 1.5;
+    h += 7 + r.ingredients.reduce((a, i) => a + 5 * lines(i, CONTENT_W - 5).length + 0.8, 0) + 1.5;
+    h += 7 + r.steps.reduce((a, st) => a + 5 * lines(st, CONTENT_W - 7).length + 0.8, 0) + 1.5;
+    h += 7 + 5 * lines(r.coachingNote, CONTENT_W).length + 4;
+    return h;
+  };
+  const USABLE_H = FOOTER_Y - 10 - (HEADER_H + 10);
 
   /* ---- page 1: title + overview ---- */
   header();
@@ -98,6 +112,12 @@ export async function buildRecipePdf(input: RecipeInput, recipes: Recipe[]): Pro
   write(`${recipes.length} coach-selected recipe${recipes.length === 1 ? '' : 's'} for ${input.mealTypes.join(', ').toLowerCase() || 'any meal'}`, 12, 'normal', MUTED, 6);
   y += 5;
   doc.setFillColor(TINT[0], TINT[1], TINT[2]);
+  if (input.coachBrand) {
+    setStyle(10.5, 'bold', INK);
+    doc.text(`Prepared by ${input.coachBrand}`, MARGIN, y);
+    y += 7;
+  }
+  // Coach notes are steering input, never printed for the client.
   const overview: [string, string][] = [
     ['Client goal', input.goal ?? 'Balanced Lifestyle'],
     ['Proteins', input.proteins.join(', ') || 'No preference'],
@@ -105,7 +125,7 @@ export async function buildRecipePdf(input: RecipeInput, recipes: Recipe[]): Pro
     ['Meal types', input.mealTypes.join(', ') || 'Any'],
     ['Cooking time', input.cookingTime ?? 'Flexible'],
   ];
-  if (input.notes.trim()) overview.push(['Client notes', input.notes.trim().slice(0, 240)]);
+  if (set.dailyTarget) overview.push(['Portion sizing', `about ${set.dailyTarget} kcal per day (from the client profile, approximate)`]);
   const boxH = overview.reduce((h, [, v]) => h + 5.5 * lines(v, CONTENT_W - 40).length + 1, 8);
   doc.roundedRect(MARGIN, y - 5, CONTENT_W, boxH, 2, 2, 'F');
   for (const [k, v] of overview) {
@@ -120,14 +140,17 @@ export async function buildRecipePdf(input: RecipeInput, recipes: Recipe[]): Pro
 
   /* ---- recipe cards ---- */
   recipes.forEach((r, i) => {
-    ensure(40);
+    const needed = measureRecipe(r) + (i > 0 ? 8 : 0);
+    // Keep each recipe on one page when it fits on a page at all.
+    if (y + needed > FOOTER_Y - 10 && needed <= USABLE_H) newPage();
     if (i > 0) {
+      ensure(10);
       doc.setDrawColor(LINE[0], LINE[1], LINE[2]);
       doc.line(MARGIN, y, PAGE_W - MARGIN, y);
       y += 8;
     }
     write(`${i + 1}. ${r.name}`, 15, 'bold', ORANGE, 7);
-    write(`${r.mealType}  ·  ${r.timeMinutes} min  ·  approx. ${r.nutrition.calories} kcal, ${r.nutrition.proteinG} g protein, ${r.nutrition.carbsG} g carbs, ${r.nutrition.fatG} g fat`, 9.5, 'normal', MUTED, 5);
+    write(`${r.mealType}  ·  ${r.timeMinutes} min  ·  approx. ${r.nutrition.calories} kcal${r.nutritionSource === 'estimated' ? '*' : ''}, ${r.nutrition.proteinG} g protein, ${r.nutrition.carbsG} g carbs, ${r.nutrition.fatG} g fat`, 9.5, 'normal', MUTED, 5);
     y += 1.5;
     write(r.description, 10.5, 'normal', INK, 5.2);
     y += 1;
@@ -145,28 +168,30 @@ export async function buildRecipePdf(input: RecipeInput, recipes: Recipe[]): Pro
     y += 4;
   });
 
-  /* ---- disclaimer ---- */
-  ensure(24);
+  /* ---- footnote + disclaimer ---- */
+  ensure(28);
   doc.setDrawColor(LINE[0], LINE[1], LINE[2]);
   doc.line(MARGIN, y, PAGE_W - MARGIN, y);
   y += 6;
+  if (recipes.some((r) => r.nutritionSource === 'estimated')) write('* Estimated from the ingredient list.', 8.5, 'normal', MUTED, 4.2);
   write(`Disclaimer: ${RECIPE_DISCLAIMER}`, 8.5, 'normal', MUTED, 4.2);
 
   /* ---- footers ---- */
+  const generated = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
   const pages = doc.getNumberOfPages();
   for (let p = 1; p <= pages; p++) {
     doc.setPage(p);
     const w = 16;
     doc.addImage(FITBUDD_LOGO_PNG, 'PNG', MARGIN, FOOTER_Y - w * FITBUDD_LOGO_RATIO + 1, w, w * FITBUDD_LOGO_RATIO);
     setStyle(8, 'normal', MUTED);
-    doc.text('Created with the FitBudd Recipe Generator', PAGE_W / 2, FOOTER_Y, { align: 'center' });
+    doc.text(`Created with the FitBudd Recipe Generator · ${generated}`, PAGE_W / 2, FOOTER_Y, { align: 'center' });
     doc.text(`Page ${p} of ${pages}`, PAGE_W - MARGIN, FOOTER_Y, { align: 'right' });
   }
   return doc;
 }
 
-export async function downloadRecipePdf(input: RecipeInput, recipes: Recipe[]): Promise<string> {
-  const doc = await buildRecipePdf(input, recipes);
+export async function downloadRecipePdf(input: RecipeInput, set: RecipeSet): Promise<string> {
+  const doc = await buildRecipePdf(input, set);
   doc.save(RECIPE_PDF_FILE);
   return RECIPE_PDF_FILE;
 }

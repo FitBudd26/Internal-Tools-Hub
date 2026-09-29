@@ -12,8 +12,8 @@ export function RecipeCard({ recipe: r, index }: { recipe: Recipe; index: number
         </span>
       </div>
       <p className="mt-0.5 text-[11px] font-semibold uppercase tracking-wide text-gray-400">
-        {r.mealType} · about {r.nutrition.calories} kcal · {r.nutrition.proteinG} g protein ·{' '}
-        {r.nutrition.carbsG} g carbs · {r.nutrition.fatG} g fat
+        {r.mealType} · about {r.nutrition.calories} kcal{r.nutritionSource === 'estimated' ? '*' : ''} ·{' '}
+        {r.nutrition.proteinG} g protein · {r.nutrition.carbsG} g carbs · {r.nutrition.fatG} g fat
       </p>
       <p className="mt-1 text-[13px] leading-snug text-gray-700">{r.description}</p>
       <p className="mt-1 text-[12px] leading-snug text-fb-teal">

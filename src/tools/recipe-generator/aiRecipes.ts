@@ -1,6 +1,8 @@
 import type { MealType, Recipe, RecipeInput, RecipeSet } from './types';
 import { MEAL_TYPES } from './types';
-import { TIME_LIMIT, containsTerm, dietViolation, dislikedTerms, generateRecipes } from './generateRecipes';
+import { TIME_LIMIT, containsTerm, dietViolation, dislikedTerms, generateRecipes, meaningfulNotes } from './generateRecipes';
+import { dailyCalorieTarget, mealTargets } from './calorieTarget';
+import { pairingProblem, reconcileNutrition } from './nutrition';
 
 /**
  * AI-first recipes with a guaranteed answer. The shared route asks Gemini
@@ -28,10 +30,11 @@ export async function generateRecipesWithAi(
   avoidNames: string[] = [],
 ): Promise<RecipeGeneration> {
   const local = generateRecipes(input, variant, COUNT, avoidNames);
-  const ai = await fetchAi(input, variant, avoidNames);
+  const daily = input.profile ? dailyCalorieTarget(input.profile, input.goal) : null;
+  const ai = await fetchAi(input, variant, avoidNames, daily);
   if (!ai || ai.length === 0) return { set: local, source: 'local' };
 
-  const disliked = dislikedTerms(input.notes);
+  const disliked = dislikedTerms(meaningfulNotes(input.notes));
   const limit = TIME_LIMIT[input.cookingTime ?? 'Flexible'];
   const requested = input.mealTypes.length ? input.mealTypes : [...MEAL_TYPES];
   const accepted: Recipe[] = [];
@@ -48,8 +51,14 @@ export async function generateRecipesWithAi(
       nutrition: r.nutrition,
       coachingNote: clean(r.coachingNote),
     };
+    // Honest macros: correct calories to the macros, or replace with the ingredient estimate when far off.
+    const reconciled = reconcileNutrition(recipe.nutrition, recipe.ingredients);
+    recipe.nutrition = reconciled.nutrition;
+    recipe.nutritionSource = reconciled.source;
     const text = `${recipe.name} ${recipe.ingredients.join(' ')}`.toLowerCase();
     const reason =
+      pairingProblem(recipe.name, recipe.ingredients) ??
+      (recipe.ingredients.some((i) => /\s+or\s+/i.test(i.replace(/\([^)]*\)/g, ''))) ? 'ambiguous either-or ingredient' : null) ??
       dietViolation(recipe, input.diets) ??
       (disliked.find((d) => containsTerm(text, d)) ? 'contains a disliked ingredient' : null) ??
       (recipe.timeMinutes > limit + 5 ? 'over the time limit' : null) ??
@@ -66,7 +75,7 @@ export async function generateRecipesWithAi(
     if (accepted.length >= COUNT) break;
     if (!accepted.some((a) => a.name.toLowerCase() === r.name.toLowerCase())) accepted.push(r);
   }
-  return { set: { recipes: accepted, notes: [] }, source: 'ai' };
+  return { set: { recipes: accepted, notes: [], dailyTarget: daily }, source: 'ai' };
 }
 
 interface AiRecipe {
@@ -81,7 +90,7 @@ interface AiRecipe {
   coachingNote: string;
 }
 
-async function fetchAi(input: RecipeInput, variant: number, avoidNames: string[]): Promise<AiRecipe[] | null> {
+async function fetchAi(input: RecipeInput, variant: number, avoidNames: string[], daily: number | null): Promise<AiRecipe[] | null> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
   try {
@@ -96,10 +105,12 @@ async function fetchAi(input: RecipeInput, variant: number, avoidNames: string[]
         diets: input.diets,
         mealTypes: input.mealTypes,
         cookingTime: input.cookingTime,
-        notes: input.notes.trim().slice(0, 600),
+        notes: meaningfulNotes(input.notes).slice(0, 600),
         count: COUNT,
         variant,
         avoidNames: avoidNames.slice(0, 15),
+        dailyTarget: daily ?? undefined,
+        mealTargets: daily ? mealTargets(daily, input.mealTypes) : undefined,
       }),
     });
     const type = res.headers.get('content-type') ?? '';

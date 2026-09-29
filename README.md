@@ -219,8 +219,13 @@ progress tracking, coaching notes and reusable client instructions, a
 Same shell and design: Client Goal (dropdown) and Meal Type (multi-select)
 on one row, Preferred Protein (multi-select, Eggs and Dairy separate,
 Seafood beside Fish) and Dietary Preference (multi-select, optional) on the
-next, Cooking Time as four chips, an optional Notes textarea, name and email,
-then Generate Recipes. No serving-size field. Results open in the shared
+next, Cooking Time as four chips, a collapsed optional "Client profile and
+PDF branding" section (sex, age, height, weight, activity, business name;
+nothing stored), an optional Notes textarea, name and email, then Generate
+Recipes. No serving-size field. A complete profile turns into a daily
+calorie target (Mifflin-St Jeor x activity, adjusted for the goal) and
+per-meal targets that size the portions; the business name prints as
+"Prepared by" on the PDF. Results open in the shared
 modal: three recipe cards (name, meal type, time, approximate calories and
 macros, goal alignment, description, ingredients and steps, coach note),
 Download PDF, "Regenerate with different recipes", a disclaimer, and the CTA
@@ -236,15 +241,34 @@ Download PDF, "Regenerate with different recipes", a disclaimer, and the CTA
   low-carb, keto and high-protein; the notes' disliked terms; the time
   limit; hype wording) and anything that fails is replaced from the
   built-in library.
-- `generateRecipes.ts`: a 40-recipe library filtered by protein, diet, meal
-  type and time and ranked by goal fit. Dietary needs and dislikes are never
-  relaxed; protein preference, time and meal type relax in that order and
-  the coach is told when they do. Regenerate pushes already-shown recipes to
-  the back. The library is verified against the same validator in tests.
+- Protein rules (`nutrition.ts`): the protein list is drawn from across the
+  set, one or two sources per recipe, never more, and legumes never land in
+  sweet or dessert-style dishes. Recipes that break this (beans in a
+  chocolate oat bowl) are dropped and replaced. Either-or ingredient lines
+  ("water or skim milk") are rejected too.
+- Honest macros (`nutrition.ts`): an ingredient-level estimator (about 80
+  reference foods, metric and US quantities, pieces, scoops, cans) recomputes
+  each recipe from its own ingredient list. Stated calories must equal
+  4 x protein + 4 x carbs + 9 x fat within 5% or they are corrected; when
+  most lines are recognised and the model's figures are more than 20% off,
+  the estimate replaces them (marked * on screen and in the PDF). The
+  library's macros are computed the same way, per serving.
+- `generateRecipes.ts`: a 40-recipe library (quantities as numerals, metric
+  first with the US measure in parentheses) filtered by protein, diet, meal
+  type and time and ranked by goal fit and closeness to the per-meal calorie
+  target. Dietary needs and dislikes are never relaxed; protein preference,
+  time and meal type relax in that order and the coach is told when they do.
+  Regenerate pushes already-shown recipes to the back. Notes without a real
+  word ("mbjk") are ignored. Verified against the same validator in tests.
 - `generatePdf.ts`: FitBudd logo (base64 PNG in `src/shared/logo.ts`,
   rendered from the site's SVG) in the header and footer of every page,
-  overview, recipe cards, ingredients, method, goal alignment, nutrition,
-  coach notes and the disclaimer; file name `fitbudd-recipe-generator.pdf`.
+  "Prepared by" line, overview (never the coach's notes), recipe cards kept
+  on one page each, ingredients, method, goal alignment, nutrition, coach
+  notes, footnote and disclaimer, generated date in the footer; file name
+  `fitbudd-recipe-generator.pdf`.
+- Not built, pending a decision: a servings input with ingredient scaling.
+  The tool spec removed serving size on purpose; the later review asked for
+  it back.
 
 ## Structure
 
@@ -265,7 +289,8 @@ src/
     components/                    SelectDropdown, MultiSelectDropdown, MultiSelectChips
                                    (≤5 options only), ToolModal, PdfDownloadButton,
                                    CTASection, HashMark, ToolMark
-    lib/tracking.ts                postEvent, email validation, trial URL
+    lib/tracking.ts                postEvent, email validation (format + disposable
+                                   domains blocked), trial URL
     lib/copy.ts                    clipboard helper with iframe fallback
   hub/                             index page
   tools/hashtag-generator/         HashtagGenerator, ResultsModal, PlatformHashtagBlock,
@@ -275,8 +300,9 @@ src/
                                    ChallengePreview, aiChallenge, generateChallenge,
                                    generatePdf, tracking, types
   tools/recipe-generator/          RecipeGenerator (form), RecipeModal, RecipeCard,
-                                   aiRecipes, generateRecipes (library), generatePdf,
-                                   tracking, types
+                                   aiRecipes, generateRecipes (library), nutrition
+                                   (estimator + protein rules), calorieTarget,
+                                   generatePdf, tracking, types
 vite.config.ts                     multi-page build + dev middleware serving api/*.ts
 vercel.json                        30 s maxDuration for api/generate.ts
 .env.example                       every env var, documented

@@ -6,6 +6,7 @@ import {
   type HashtagFormState,
   type PlatformHashtags,
 } from './types';
+import { isValidEmail } from '../../shared/lib/tracking';
 import { generateWithAi } from './aiHashtags';
 import { trackGeneration } from './tracking';
 import { HashMark } from '../../shared/components/HashMark';
@@ -19,8 +20,6 @@ const validCls =
   'border-gray-300 focus:border-fb-orange focus:ring-fb-orange/25';
 const invalidCls = 'border-red-400 focus:border-red-400 focus:ring-red-300/40';
 const labelCls = 'mb-1 block text-sm font-bold text-gray-900';
-
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 type Pending = 'idle' | 'generate' | 'regenerate';
 type Field = 'caption' | 'platforms' | 'name' | 'email';
@@ -60,7 +59,7 @@ export function HashtagGenerator() {
   const captionValid = form.caption.trim().length > 0;
   const platformsValid = form.platforms.length > 0;
   const nameValid = form.name.trim().length > 0;
-  const emailValid = EMAIL_RE.test(form.email.trim());
+  const emailValid = isValidEmail(form.email);
   const isValid = captionValid && platformsValid && nameValid && emailValid;
 
   const captionError = touched.caption && !captionValid;

@@ -61,6 +61,15 @@ export type Diet = (typeof DIETS)[number];
 export type MealType = (typeof MEAL_TYPES)[number];
 export type CookingTime = (typeof COOKING_TIMES)[number];
 
+/** Optional, anonymous client profile used only to size portions. */
+export interface ClientProfile {
+  sex: 'Female' | 'Male' | null;
+  age: number | null;
+  heightCm: number | null;
+  weightKg: number | null;
+  activity: 'Sedentary' | 'Lightly active' | 'Moderately active' | 'Very active' | null;
+}
+
 export interface RecipeInput {
   goal: ClientGoal | null;
   proteins: Protein[];
@@ -68,6 +77,9 @@ export interface RecipeInput {
   mealTypes: MealType[];
   cookingTime: CookingTime | null;
   notes: string;
+  profile?: ClientProfile;
+  /** Coach or business name printed on the client PDF ("Prepared by"). */
+  coachBrand?: string;
 }
 
 /** Approximate, per serving. Guidance for coaches, never a clinical prescription. */
@@ -86,6 +98,8 @@ export interface Recipe {
   steps: string[];
   timeMinutes: number;
   nutrition: Nutrition;
+  /** 'estimated' = computed from the ingredient list, 'adjusted' = calories corrected to the macros. */
+  nutritionSource?: 'stated' | 'adjusted' | 'estimated';
   coachingNote: string;
   /** Which of the requested meal types this recipe serves best. */
   mealType: MealType;
@@ -95,6 +109,8 @@ export interface RecipeSet {
   recipes: Recipe[];
   /** Plain-language notes on constraints that had to be relaxed to fill the set. */
   notes: string[];
+  /** Daily calorie target derived from the client profile, when one was given. */
+  dailyTarget?: number | null;
 }
 
 /** What the single-screen form holds (RecipeInput + the lead). */
