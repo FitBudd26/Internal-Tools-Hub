@@ -111,7 +111,6 @@ export async function buildRecipePdf(input: RecipeInput, set: RecipeSet): Promis
   y += 1;
   write(`${recipes.length} coach-selected recipe${recipes.length === 1 ? '' : 's'} for ${input.mealTypes.join(', ').toLowerCase() || 'any meal'}`, 12, 'normal', MUTED, 6);
   y += 5;
-  doc.setFillColor(TINT[0], TINT[1], TINT[2]);
   if (input.coachBrand) {
     setStyle(10.5, 'bold', INK);
     doc.text(`Prepared by ${input.coachBrand}`, MARGIN, y);
@@ -127,6 +126,8 @@ export async function buildRecipePdf(input: RecipeInput, set: RecipeSet): Promis
   ];
   if (set.dailyTarget) overview.push(['Portion sizing', `about ${set.dailyTarget} kcal per day (from the client profile, approximate)`]);
   const boxH = overview.reduce((h, [, v]) => h + 5.5 * lines(v, CONTENT_W - 40).length + 1, 8);
+  // Set the fill right before drawing: any text drawn in between resets the fill colour.
+  doc.setFillColor(TINT[0], TINT[1], TINT[2]);
   doc.roundedRect(MARGIN, y - 5, CONTENT_W, boxH, 2, 2, 'F');
   for (const [k, v] of overview) {
     setStyle(10, 'bold', INK);
