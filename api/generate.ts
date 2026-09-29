@@ -11,7 +11,7 @@
  *   GEMINI_MODEL     optional, defaults to gemini-3.5-flash-lite (free tier,
  *                    fast); gemini-3.8-flash is the higher-quality free option
  *
- * Request body: { tool: 'hashtags' | 'challenge' | 'recipes' | 'igbio', ...input }.
+ * Request body: { tool: 'hashtags' | 'challenge' | 'recipes' | 'igbio' | 'igusername', ...input }.
  * Each client re-validates what the model returns, so this route only has
  * to return well-formed JSON. Any non-200 answer makes the client fall back
  * to its local engine, so users always get results.
@@ -483,7 +483,60 @@ const igbio: ToolSpec = {
   },
 };
 
-const TOOLS: Record<string, ToolSpec> = { hashtags, challenge, recipes, igbio };
+/* ------------------------------- igusername ------------------------------- */
+
+const igusername: ToolSpec = {
+  maxOutputTokens: 1024,
+  parse(o) {
+    const fullName = str(o.fullName, 80);
+    const niches = strings(o.niches, 13, 30);
+    const trainerTypes = strings(o.trainerTypes, 10, 40);
+    if (!fullName || !niches.length || !trainerTypes.length) return null;
+    return {
+      fullName,
+      niches,
+      trainerTypes,
+      tones: strings(o.tones, 5, 20),
+      keyword: str(o.keyword, 30),
+      variant: num(o.variant, 0, 99) ?? 0,
+      avoid: strings(o.avoid, 30, 40),
+    };
+  },
+  prompt(input) {
+    const i = input as { fullName: string; niches: string[]; trainerTypes: string[]; tones: string[]; keyword: string; variant: number; avoid: string[] };
+    return [
+      'You create Instagram username ideas for a fitness professional. Reply with JSON only, matching the schema: {"usernames":["...", ...]}.',
+      '',
+      `Full name or brand: ${i.fullName}`,
+      `Fitness niche(s): ${i.niches.join(', ')}`,
+      `Trainer type(s): ${i.trainerTypes.join(', ')}`,
+      `Tone / style: ${i.tones.join(', ') || 'Professional'}`,
+      `Keyword to include where it reads naturally: ${i.keyword || 'none'}`,
+      `Variation seed: ${i.variant} (make this set read differently from other seeds for the same inputs).`,
+      '',
+      'Return exactly 16 candidates (the best 10 are kept):',
+      '- Lowercase letters only, plus at most ONE period or underscore; 3-18 characters; no numbers, no @, no spaces, no accents.',
+      '- Built from the first name or brand plus the niche, role, tone or keyword: e.g. coach.alex, alexshred, trainwithalex, thealexmethod, alex.strength, alexfitlab.',
+      '- Readable and brandable: easy to say out loud, spell and type; no random letter strings, no filler like "official" or "real", no doubled words.',
+      '- Vary the formats across the set (role + name, name + niche, verb + name, name + tone suffix, keyword combinations) and keep them distinct from one another.',
+      '- Match the tone: Professional stays clean (coach.alex, alexcoaching), Trendy and Playful can use go/get/vibes/moves, Minimalist is short (alexfit, alex.co), Unique can use forge/lab/atlas style suffixes.',
+      ...(i.avoid.length ? [`- Do not return these or trivial variations of them: ${i.avoid.join(', ')}`] : []),
+      '- Availability on Instagram cannot be checked here; do not claim any handle is available.',
+    ].join('\n');
+  },
+  schema: {
+    type: 'OBJECT',
+    properties: { usernames: { type: 'ARRAY', items: { type: 'STRING' } } },
+    required: ['usernames'],
+  },
+  normalize(parsed) {
+    if (!parsed || typeof parsed !== 'object') return null;
+    const usernames = strings((parsed as { usernames?: unknown }).usernames, 24, 40).map((u) => u.replace(/^@/, '').toLowerCase());
+    return usernames.length ? { usernames } : null;
+  },
+};
+
+const TOOLS: Record<string, ToolSpec> = { hashtags, challenge, recipes, igbio, igusername };
 
 /* -------------------------------- handler -------------------------------- */
 

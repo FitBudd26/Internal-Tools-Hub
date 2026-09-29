@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { HashMark } from '../../shared/components/HashMark';
+import { InstagramMark } from '../../shared/components/InstagramMark';
 import { MultiSelectDropdown } from '../../shared/components/MultiSelectDropdown';
 import { SelectDropdown } from '../../shared/components/SelectDropdown';
 import { isValidEmail } from '../../shared/lib/tracking';
@@ -100,7 +100,7 @@ export function IgBioGenerator() {
         <form onSubmit={handleSubmit} className="flex flex-1 flex-col gap-2.5" noValidate>
           <div>
             <h1 className="flex items-center justify-center gap-1.5 whitespace-nowrap text-sm font-bold text-fb-orange">
-              <HashMark size={20} className="shrink-0" />
+              <InstagramMark size={20} className="shrink-0" />
               <span className="truncate">Instagram Bio Generator</span>
             </h1>
             <p className="mt-1 text-center text-[13px] text-gray-600">

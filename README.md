@@ -11,6 +11,7 @@ tool with its embed snippet.
 | Hashtag Generator | `/hashtag-generator/` | Platform-tailored hashtag sets from a caption (Gemini, with a deterministic fallback), shown in a modal with copy buttons and a CTA | name + email |
 | Fitness Challenge Generator for Coaches & Gyms | `/fitness-challenge-generator/` | Same single-screen design as the Hashtag Generator (dropdowns + name/email) → ready-to-run client challenge framework in the results modal (Gemini with a deterministic fallback), with a branded PDF download and a 30-day-trial CTA | name + email (selections too once its form has the fields) |
 | Instagram Bio Generator | `/ig-bio-generator/` | Migrated from ig-bio-gen.vercel.app into the shared shell: business type, audience, specializations, tone, experience, location and USP → four bios in four angles (authority, results, community, value) within Instagram's 150 characters; Gemini with the original templated engine as fallback | name + email (the original custom fields too once the form has them) |
+| Instagram Username Generator | `/ig-username-generator/` | Migrated from ig-username-gen.vercel.app: niche(s), trainer type(s), tone chips and an optional keyword → ten short, brandable handles (lowercase letters, one separator at most, 3-18 characters, no numbers), Copy / Copy All, availability caveat; Gemini with the original engine as fallback | name + email (the original custom fields too once the form has them) |
 | Fitness Recipe Generator for Coaches & Gyms | `/recipe-generator/` | Same design → three distinct, goal-aligned recipes that honour every dietary restriction and the coach's notes (Gemini with a 40-recipe library as fallback), approximate nutrition, coach notes, a logo-branded PDF, disclaimer and a free-trial CTA | name + email (selections too once its form has the fields) |
 
 **Stack:** React 19 · TypeScript · Tailwind CSS v4 · Vite (multi-page) ·
@@ -84,7 +85,8 @@ allowed fields to HubSpot's Forms Submission API. Defaults: FitBudd's portal
 `e7410680-1ea2-4f36-8f94-bde4cd94aa62`, Challenge Generator
 `ca6c259d-e274-49fd-8cf0-b5515be51a34`, Recipe Generator
 `b2222d23-1400-4bec-a812-e818740c59f5`, Instagram Bio Generator
-`784af8e3-2341-4478-9ec4-8452914687db`. The IDs are public (they appear in
+`784af8e3-2341-4478-9ec4-8452914687db`, Instagram Username Generator
+`8ec4d71b-21b7-4639-9849-e47ae5bea96d`. The IDs are public (they appear in
 the forms' embed snippets). Nothing HubSpot-related ships in the bundle.
 
 ```
@@ -94,6 +96,7 @@ HUBSPOT_FORM_ID_HASHTAG_GENERATOR             optional, per-tool form
 HUBSPOT_FORM_ID_FITNESS_CHALLENGE_GENERATOR   optional, per-tool form
 HUBSPOT_FORM_ID_RECIPE_GENERATOR              optional, per-tool form
 HUBSPOT_FORM_ID_IG_BIO_GENERATOR              optional, per-tool form
+HUBSPOT_FORM_ID_IG_USERNAME_GENERATOR         optional, per-tool form
 HUBSPOT_PRIVATE_APP_TOKEN                     optional, authenticated secure-submit endpoint
 VITE_TRACK_IN_DEV                             dev only, 'true' sends events from `npm run dev`
 ```
@@ -116,6 +119,11 @@ What each tool sends:
   `campaign`, `page_url`,
   `submitted_at`; then `cta_click`. Its form is
   `784af8e3-2341-4478-9ec4-8452914687db`.
+- **Instagram Username Generator**, `generation` (on Generate): `email`,
+  `firstname`, `fitness_niches`, `trainer_types`, `tone_styles`, `keyword`,
+  `generated_usernames`, `source`, `tool_source`, `campaign`, `page_url`,
+  `submitted_at`; then `cta_click`. Its form is
+  `8ec4d71b-21b7-4639-9849-e47ae5bea96d`.
 - **Recipe Generator**, `lead` (on Generate Recipes): `email`, `firstname`,
   `client_goal`, `preferred_protein`, `dietary_preference`, `meal_type`,
   `cooking_time`, `notes`, `generated_recipes`, `tool_source`, `campaign`
@@ -328,6 +336,27 @@ deliberately not part of this tool; a separate tool covers them.
   content but made deterministic and seedable (Regenerate rotates variants),
   with Auto tone inference. Fallback only.
 
+## Instagram Username Generator
+
+Migrated from the standalone IG-username-Gen repo (ig-username-gen.vercel.app).
+Same inputs in the hub shell: Fitness Niche/Specialty and Trainer Type
+(multi-select dropdowns, required), Tone/Style chips, an optional Keyword,
+then Full Name and Email. Results open in the shared modal: ten handles in a
+two-column list with Copy on each, Copy All, an availability caveat,
+Regenerate, and the original CTA copy ("92% of personal trainers using
+FitBudd gave us 5 stars") with the free-trial link. The old tool's
+full-screen expand button was dropped; the hub modal covers that need.
+
+- Gemini-first (`aiUsernames.ts`): the prompt asks for 16 candidates built
+  from the first name or brand, niche, role, tone and keyword under the
+  tool's rules; every handle is validated (lowercase letters, one period or
+  underscore at most, 3-18 characters, no numbers), de-duplicated, kept away
+  from the previous set, and the best ten are shown, topped up from the
+  engine when needed.
+- `generateUsernames.ts`: the original engine, ported with its term
+  dictionaries and ranking, made deterministic and seedable so Regenerate
+  rotates the mix. Fallback only.
+
 ## Structure
 
 ```
@@ -336,6 +365,7 @@ hashtag-generator/index.html       tool page (iframe-resizer child)
 fitness-challenge-generator/index.html
 recipe-generator/index.html
 ig-bio-generator/index.html
+ig-username-generator/index.html
 api/
   track.ts                         shared HubSpot route: per-tool form + fields
   generate.ts                      shared Gemini route: hashtags, challenge, recipes
@@ -347,7 +377,7 @@ src/
     disclaimers.ts                 recipe + challenge disclaimers
     components/                    SelectDropdown, MultiSelectDropdown, MultiSelectChips
                                    (≤5 options only), ToolModal, PdfDownloadButton,
-                                   CTASection, HashMark, ToolMark
+                                   CTASection, HashMark, ToolMark, InstagramMark
     lib/tracking.ts                postEvent, email validation (format + disposable
                                    domains blocked), trial URL
     lib/copy.ts                    clipboard helper with iframe fallback
@@ -360,6 +390,8 @@ src/
                                    generatePdf, tracking, types
   tools/ig-bio-generator/          IgBioGenerator (form), BioResultsModal, BioCard,
                                    aiBios, generateBios (fallback), tracking, types
+  tools/ig-username-generator/     IgUsernameGenerator (form), UsernameResultsModal,
+                                   aiUsernames, generateUsernames (fallback), tracking, types
   tools/recipe-generator/          RecipeGenerator (form), RecipeModal, RecipeCard,
                                    aiRecipes, generateRecipes (library), nutrition
                                    (estimator + protein rules), calorieTarget,

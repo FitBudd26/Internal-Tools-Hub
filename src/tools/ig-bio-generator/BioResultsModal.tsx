@@ -1,5 +1,5 @@
 import { CTASection } from '../../shared/components/CTASection';
-import { HashMark } from '../../shared/components/HashMark';
+import { InstagramMark } from '../../shared/components/InstagramMark';
 import { ToolModal } from '../../shared/components/ToolModal';
 import { BioCard } from './BioCard';
 import { CTA_TEXT, CTA_URL, DEMO_URL } from './tracking';
@@ -20,7 +20,7 @@ export function BioResultsModal({ open, result, regenerating, onClose, onRegener
     <ToolModal
       open={open}
       onClose={onClose}
-      icon={<HashMark size={18} className="shrink-0" />}
+      icon={<InstagramMark size={18} className="shrink-0" />}
       title="Your Bios Are Ready"
       subtitle={`Four angles in a ${result.tone.toLowerCase()} tone, all within Instagram's 150 characters.`}
       footer={

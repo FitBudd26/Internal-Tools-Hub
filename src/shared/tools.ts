@@ -31,6 +31,13 @@ export const TOOLS: ToolMeta[] = [
     fallbackHeight: 580,
   },
   {
+    slug: 'ig-username-generator',
+    name: 'Instagram Username Generator',
+    description:
+      'Ten short, brandable Instagram handles from a name, niche, trainer type, tone and keyword (Gemini with the original engine as fallback). Captures name + email. Migrated from ig-username-gen.vercel.app.',
+    fallbackHeight: 580,
+  },
+  {
     slug: 'recipe-generator',
     name: 'Fitness Recipe Generator for Coaches & Gyms',
     description:

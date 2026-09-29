@@ -88,6 +88,7 @@ export default defineConfig({
         'fitness-challenge-generator': 'fitness-challenge-generator/index.html',
         'recipe-generator': 'recipe-generator/index.html',
         'ig-bio-generator': 'ig-bio-generator/index.html',
+        'ig-username-generator': 'ig-username-generator/index.html',
       },
     },
   },
