@@ -1,12 +1,13 @@
-import type { HashtagFormState, PlatformHashtags } from '../types';
+import type { HashtagFormState } from '../types';
 
 /**
- * CTA constants and optional HubSpot event tracking.
+ * CTA constants and HubSpot lead capture.
  *
- * Events are POSTed to our own serverless route (/api/track) which holds
- * the HubSpot credentials server-side — nothing sensitive ships in this
- * bundle. Every call is fire-and-forget: tracking can never block results
- * or the CTA.
+ * When hashtags are generated, the visitor's name and email are POSTed to
+ * our own serverless route (/api/track), which forwards them to FitBudd's
+ * HubSpot form. Those two values are the only data recorded — the form has
+ * exactly those two fields and nothing else is meant to be stored. The call
+ * is fire-and-forget: tracking can never block results or the CTA.
  */
 
 const TOOL_SOURCE: string =
@@ -37,35 +38,12 @@ function post(type: string, fields: Record<string, string>): void {
   }
 }
 
-/** Record a successful generation (no personal data — there is no email field). */
-export function trackGeneration(
-  form: HashtagFormState,
-  results: PlatformHashtags[],
-): void {
+/** Record the lead (name + email) once hashtags have been generated. */
+export function trackGeneration(form: HashtagFormState): void {
   post('generation', {
-    caption: form.caption.trim().slice(0, 2000),
-    topic: form.topic.trim(),
-    post_type: form.postType ?? '',
-    target_platforms: form.platforms.join(', '),
-    tone_goal: form.tones.join(', '),
-    generated_hashtags: results
-      .map((g) => `${g.platform}: ${g.tags.map((t) => `#${t}`).join(' ')}`)
-      .join('\n'),
-    tool_source: TOOL_SOURCE,
-    campaign: CAMPAIGN,
-    page_url: window.location.href,
-    submitted_at: new Date().toISOString(),
-  });
-}
-
-/** Record a Start Free Trial click; the link opens regardless. */
-export function trackCtaClick(): void {
-  post('cta_click', {
-    cta_clicked: 'true',
-    cta_text: CTA_TEXT,
-    cta_url: CTA_URL,
-    cta_clicked_at: new Date().toISOString(),
-    tool_source: TOOL_SOURCE,
-    page_url: window.location.href,
+    email: form.email.trim(),
+    firstname: form.name.trim(),
+    // Context only (HubSpot's pageUri): the embedding page when in an iframe.
+    page_url: document.referrer || window.location.href,
   });
 }

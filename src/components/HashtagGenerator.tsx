@@ -18,8 +18,21 @@ const inputCls =
 const validCls =
   'border-gray-300 focus:border-fb-orange focus:ring-fb-orange/25';
 const invalidCls = 'border-red-400 focus:border-red-400 focus:ring-red-300/40';
+const labelCls = 'mb-1 block text-sm font-bold text-gray-900';
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 type Pending = 'idle' | 'generate' | 'regenerate';
+type Field = 'caption' | 'platforms' | 'name' | 'email';
+
+function RequiredMark() {
+  return (
+    <span className="text-fb-orange" aria-hidden="true">
+      {' '}
+      *
+    </span>
+  );
+}
 
 export function HashtagGenerator() {
   const [form, setForm] = useState<HashtagFormState>({
@@ -28,20 +41,32 @@ export function HashtagGenerator() {
     postType: null,
     platforms: [],
     tones: [],
+    name: '',
+    email: '',
   });
-  const [captionTouched, setCaptionTouched] = useState(false);
-  const [platformsTouched, setPlatformsTouched] = useState(false);
+  const [touched, setTouched] = useState<Record<Field, boolean>>({
+    caption: false,
+    platforms: false,
+    name: false,
+    email: false,
+  });
   const [results, setResults] = useState<PlatformHashtags[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
   const [variant, setVariant] = useState(0);
   const [pending, setPending] = useState<Pending>('idle');
 
+  const touch = (field: Field) => setTouched((t) => ({ ...t, [field]: true }));
+
   const captionValid = form.caption.trim().length > 0;
   const platformsValid = form.platforms.length > 0;
-  const isValid = captionValid && platformsValid;
+  const nameValid = form.name.trim().length > 0;
+  const emailValid = EMAIL_RE.test(form.email.trim());
+  const isValid = captionValid && platformsValid && nameValid && emailValid;
 
-  const captionError = captionTouched && !captionValid;
-  const platformsError = platformsTouched && !platformsValid;
+  const captionError = touched.caption && !captionValid;
+  const platformsError = touched.platforms && !platformsValid;
+  const nameError = touched.name && !nameValid;
+  const emailError = touched.email && !emailValid;
   const generating = pending === 'generate';
 
   const handleGenerate = async (e: FormEvent<HTMLFormElement>) => {
@@ -54,8 +79,8 @@ export function HashtagGenerator() {
       setResults(groups);
       setVariant(0);
       setModalOpen(true);
-      // Optional HubSpot usage tracking; fire-and-forget, never blocks results.
-      trackGeneration(form, groups);
+      // HubSpot lead capture (name + email); fire-and-forget, never blocks results.
+      trackGeneration(form);
     } finally {
       setPending('idle');
     }
@@ -95,12 +120,9 @@ export function HashtagGenerator() {
 
           <div>
             <label className="block">
-              <span className="mb-1 block text-sm font-bold text-gray-900">
+              <span className={labelCls}>
                 Caption
-                <span className="text-fb-orange" aria-hidden="true">
-                  {' '}
-                  *
-                </span>
+                <RequiredMark />
               </span>
               <textarea
                 required
@@ -110,7 +132,7 @@ export function HashtagGenerator() {
                 onChange={(e) =>
                   setForm((f) => ({ ...f, caption: e.target.value }))
                 }
-                onBlur={() => setCaptionTouched(true)}
+                onBlur={() => touch('caption')}
                 aria-invalid={captionError}
                 className={`${inputCls} h-[60px] resize-none py-2 ${captionError ? invalidCls : validCls}`}
               />
@@ -123,7 +145,7 @@ export function HashtagGenerator() {
           </div>
 
           <label className="block">
-            <span className="mb-1 block text-sm font-bold text-gray-900">
+            <span className={labelCls}>
               Topic/Niche/Keyword{' '}
               <span className="font-normal text-gray-400">(recommended)</span>
             </span>
@@ -154,7 +176,7 @@ export function HashtagGenerator() {
               options={PLATFORM_OPTIONS}
               selected={form.platforms}
               onChange={(platforms) => {
-                setPlatformsTouched(true);
+                touch('platforms');
                 setForm((f) => ({ ...f, platforms }));
               }}
             />
@@ -171,6 +193,65 @@ export function HashtagGenerator() {
             selected={form.tones}
             onChange={(tones) => setForm((f) => ({ ...f, tones }))}
           />
+
+          {/* Lead capture: side by side when the card is wide enough (container query). */}
+          <div className="@container">
+            <div className="grid grid-cols-1 gap-2.5 @sm:grid-cols-2">
+              <div>
+                <label className="block">
+                  <span className={labelCls}>
+                    Name
+                    <RequiredMark />
+                  </span>
+                  <input
+                    type="text"
+                    required
+                    autoComplete="name"
+                    placeholder="Your name"
+                    value={form.name}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, name: e.target.value }))
+                    }
+                    onBlur={() => touch('name')}
+                    aria-invalid={nameError}
+                    className={`${inputCls} h-10 ${nameError ? invalidCls : validCls}`}
+                  />
+                </label>
+                {nameError && (
+                  <p className="mt-1 text-xs text-red-500" role="alert">
+                    Name is required.
+                  </p>
+                )}
+              </div>
+              <div>
+                <label className="block">
+                  <span className={labelCls}>
+                    Email
+                    <RequiredMark />
+                  </span>
+                  <input
+                    type="email"
+                    required
+                    inputMode="email"
+                    autoComplete="email"
+                    placeholder="you@example.com"
+                    value={form.email}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, email: e.target.value }))
+                    }
+                    onBlur={() => touch('email')}
+                    aria-invalid={emailError}
+                    className={`${inputCls} h-10 ${emailError ? invalidCls : validCls}`}
+                  />
+                </label>
+                {emailError && (
+                  <p className="mt-1 text-xs text-red-500" role="alert">
+                    Enter a valid email address.
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
 
           <div className="mt-auto">
             <button

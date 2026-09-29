@@ -10,8 +10,8 @@ Sibling project to the Gym Name Generator and shares its design system.
 
 **Stack:** React 19 · TypeScript · Tailwind CSS v4 · Vite, plus two Vercel
 serverless routes: `api/generate.ts` (Gemini hashtag generation, optional)
-and `api/track.ts` (HubSpot tracking, optional). There is deliberately no
-email/name field — generation is gated by caption + platform only.
+and `api/track.ts` (HubSpot lead capture). Generating requires a name and
+a valid email; those two values are the only data recorded in HubSpot.
 
 ## Commands
 
@@ -96,17 +96,19 @@ selected platform, used when AI is unavailable and to top up short AI sets:
   caption's own hashtags are never re-suggested
 - deterministic per input; Regenerate reshuffles each platform's pool
 
-Validation: caption + at least one platform, compact inline errors, no
-browser alerts, button disabled until valid.
+Validation: caption, at least one platform, name and a valid email —
+compact inline errors, no browser alerts, button disabled until valid.
 
-## HubSpot tracking (optional)
+## HubSpot lead capture
 
-Generation events and CTA clicks are POSTed to `/api/track`, which forwards
-them to HubSpot's Forms Submission API for FitBudd's Hashtag Generator form
-(portal `9058640`, form `e7410680-1ea2-4f36-8f94-bde4cd94aa62`, region na1).
-Those two IDs are public — they appear in the form's embed snippet — so they
-are the defaults and tracking works with no configuration. Credentials stay
-in **server** env vars; nothing HubSpot-related ships in the frontend bundle:
+When hashtags are generated, the visitor's **name and email** are POSTed to
+`/api/track`, which forwards them to FitBudd's Hashtag Generator form
+(portal `9058640`, form `e7410680-1ea2-4f36-8f94-bde4cd94aa62`, region na1)
+as `email` + `firstname` — the two fields that form has. Nothing else about
+the generation (caption, platforms, hashtags, CTA clicks) is recorded. The
+portal and form IDs are public (they appear in the form's embed snippet), so
+they are the defaults and tracking works with no configuration. Credentials
+stay in **server** env vars; nothing HubSpot-related ships in the bundle:
 
 ```
 HUBSPOT_PORTAL_ID           optional — override the default portal
@@ -117,33 +119,16 @@ VITE_TRACK_IN_DEV           dev only — 'true' sends events from `npm run dev` 
 ```
 
 HubSpot rejects a whole submission if it names a field the form does not
-define, so the route reads the form's public definition, sends only the
-fields that exist, and logs what is missing. `GET /api/track` answers
-`{ portalId, formId, authenticated, formFields, missingFields,
-requiredButNeverSent }` — the quickest way to see whether the form is ready.
+define, so the route reads the form's public definition and sends only the
+fields that exist. `GET /api/track` answers `{ portalId, formId,
+authenticated, formFields, missingFields, requiredButNeverSent }`; with the
+form as it is today both lists are empty, which means it is ready. Leads
+appear as contacts (email + first name) and under Marketing → Forms → the
+form → Submissions. Local dev skips tracking unless `VITE_TRACK_IN_DEV=true`,
+because every event is a real submission. HubSpot rejections are logged in
+the Vercel function logs.
 
-**Form setup (one-time, in HubSpot):** as of 2026-09-29 the form only has
-`email` (required) and `firstname`, so nothing is recorded yet. To capture
-the tool's data:
-
-1. Settings → Properties → Contact properties → Create: one single-line text
-   property per field below, using the exact internal name (`generated_hashtags`
-   and `caption` are better as multi-line text).
-2. Marketing → Forms → open the form → add those properties as fields.
-3. Make **Email not required** (or remove it): this tool never collects an
-   email, and a required field that is never sent rejects every submission.
-   Submissions without an email are kept under the form's Submissions tab
-   but do not create contacts.
-
-Submissions appear under Marketing → Forms → the form → Submissions. Local
-dev skips tracking unless `VITE_TRACK_IN_DEV=true`, because every event is
-a real submission. HubSpot rejections are logged in the Vercel function logs.
-
-Create a HubSpot form whose fields match the event payloads (all single- or
-multi-line text): `caption`, `topic`, `post_type`, `target_platforms`,
-`tone_goal`, `generated_hashtags`, `tool_source`, `campaign`, `page_url`,
-`submitted_at`, plus `cta_clicked`, `cta_text`, `cta_url`, `cta_clicked_at`.
-Missing env vars or HubSpot errors are swallowed — the tool never blocks on
+HubSpot errors are logged and swallowed — the tool never blocks on
 tracking. The CTA links to
 `https://dashboard.fitbudd.com/signup?utm_source=hashtag_generator&utm_medium=tool_cta&utm_campaign=lead_conversion`.
 
@@ -166,7 +151,7 @@ src/
   lib/
     aiHashtags.ts            /api/generate client: validates model output, local fallback
     generateHashtags.ts      deterministic generation engine + shared tag rules
-    tracking.ts              CTA constants + event posting to /api/track
+    tracking.ts              CTA constants + lead (name/email) posting to /api/track
     copy.ts                  clipboard helper with iframe fallback
   types.ts                   options + shared types
 vite.config.ts               build config + dev middleware serving api/*.ts locally

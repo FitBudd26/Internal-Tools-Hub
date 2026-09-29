@@ -1,4 +1,4 @@
-import { CTA_TEXT, CTA_URL, trackCtaClick } from '../lib/tracking';
+import { CTA_TEXT, CTA_URL } from '../lib/tracking';
 
 export function CTASection() {
   return (
@@ -15,7 +15,6 @@ export function CTASection() {
         href={CTA_URL}
         target="_blank"
         rel="noopener noreferrer"
-        onClick={trackCtaClick}
         className="mt-2.5 flex h-[46px] w-full items-center justify-center rounded-lg bg-fb-teal text-sm font-semibold text-white transition-colors hover:bg-fb-teal-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fb-teal"
       >
         {CTA_TEXT}

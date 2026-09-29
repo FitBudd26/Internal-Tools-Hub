@@ -1,7 +1,7 @@
 /**
- * Vercel serverless route: forwards tool events to HubSpot's Forms
- * Submission API. Credentials live only in server env vars — never in the
- * frontend bundle:
+ * Vercel serverless route: forwards the lead (name + email) captured by the
+ * tool to HubSpot's Forms Submission API. Credentials live only in server
+ * env vars — never in the frontend bundle:
  *
  *   HUBSPOT_PORTAL_ID            optional — defaults to FitBudd's portal
  *   HUBSPOT_FORM_ID              optional — defaults to the Hashtag Generator form
@@ -24,32 +24,16 @@ declare const process: { env: Record<string, string | undefined> };
 const DEFAULT_PORTAL_ID = '9058640';
 const DEFAULT_FORM_ID = 'e7410680-1ea2-4f36-8f94-bde4cd94aa62';
 
+/**
+ * Only these reach HubSpot as form fields — the form has exactly Email and
+ * First Name, and nothing else is meant to be recorded. `page_url` in the
+ * payload is used for the submission context, never as a field.
+ */
 const ALLOWED_FIELDS: Record<string, string[]> = {
-  generation: [
-    'caption',
-    'topic',
-    'post_type',
-    'target_platforms',
-    'tone_goal',
-    'generated_hashtags',
-    'tool_source',
-    'campaign',
-    'page_url',
-    'submitted_at',
-  ],
-  cta_click: [
-    'cta_clicked',
-    'cta_text',
-    'cta_url',
-    'cta_clicked_at',
-    'tool_source',
-    'page_url',
-  ],
+  generation: ['email', 'firstname'],
 };
 
-const ALL_TOOL_FIELDS = [
-  ...new Set([...ALLOWED_FIELDS.generation, ...ALLOWED_FIELDS.cta_click]),
-];
+const ALL_TOOL_FIELDS = [...new Set(Object.values(ALLOWED_FIELDS).flat())];
 
 /** Field names on the target form, and which of them HubSpot requires. */
 interface FormShape {
