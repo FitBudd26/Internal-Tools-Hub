@@ -1,6 +1,7 @@
 import type { jsPDF } from 'jspdf';
 import type { Challenge, DailyRule } from './types';
 import { slugify } from './generateChallenge';
+import { CHALLENGE_DISCLAIMER } from '../../shared/disclaimers';
 
 /**
  * Client-ready, coach-branding-neutral PDF of the challenge. jsPDF is loaded
@@ -164,6 +165,14 @@ export async function buildChallengePdf(challenge: Challenge): Promise<jsPDF> {
     section.bullets?.forEach((b) => bullet(b));
     if (section.numbered) numbered(section.numbered);
   }
+
+  /* ---- disclaimer ---- */
+  ensure(20);
+  y += 2;
+  doc.setDrawColor(LINE[0], LINE[1], LINE[2]);
+  doc.line(MARGIN, y, PAGE_W - MARGIN, y);
+  y += 6;
+  write(`Disclaimer: ${CHALLENGE_DISCLAIMER}`, 8.5, 'normal', MUTED, 4.2);
 
   /* ---- footers ---- */
   const pages = doc.getNumberOfPages();

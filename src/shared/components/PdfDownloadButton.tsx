@@ -1,22 +1,29 @@
 import { useState } from 'react';
-import type { Challenge } from './types';
-import { downloadChallengePdf } from './generatePdf';
 
 type State = 'idle' | 'busy' | 'done' | 'error';
 
-interface PDFDownloadButtonProps {
-  challenge: Challenge;
+interface PdfDownloadButtonProps {
+  /** Builds and triggers the download; resolves with the file name. */
+  onDownload: () => Promise<string>;
   onDownloaded?: (fileName: string) => void;
+  label?: string;
+  ariaLabel: string;
 }
 
-export function PDFDownloadButton({ challenge, onDownloaded }: PDFDownloadButtonProps) {
+/** Orange primary button that builds a PDF on demand and reports the outcome. */
+export function PdfDownloadButton({
+  onDownload,
+  onDownloaded,
+  label = 'Download PDF',
+  ariaLabel,
+}: PdfDownloadButtonProps) {
   const [state, setState] = useState<State>('idle');
 
   const handleClick = async () => {
     if (state === 'busy') return;
     setState('busy');
     try {
-      const name = await downloadChallengePdf(challenge);
+      const name = await onDownload();
       setState('done');
       onDownloaded?.(name);
       window.setTimeout(() => setState('idle'), 2000);
@@ -25,24 +32,24 @@ export function PDFDownloadButton({ challenge, onDownloaded }: PDFDownloadButton
     }
   };
 
-  const label =
+  const text =
     state === 'busy'
       ? 'Preparing PDF…'
       : state === 'done'
         ? '✓ PDF downloaded'
         : state === 'error'
           ? 'Download failed, try again'
-          : 'Download PDF';
+          : label;
 
   return (
     <button
       type="button"
       onClick={handleClick}
       aria-busy={state === 'busy'}
-      aria-label={`Download the ${challenge.challengeName} as a PDF`}
+      aria-label={ariaLabel}
       className="h-[46px] w-full rounded-xl bg-fb-orange text-sm font-semibold text-white transition-colors hover:bg-fb-accent-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fb-orange aria-busy:cursor-wait aria-busy:opacity-80"
     >
-      {label}
+      {text}
     </button>
   );
 }

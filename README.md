@@ -9,18 +9,26 @@ tool with its embed snippet.
 | Tool | Path | What it does | HubSpot data |
 | --- | --- | --- | --- |
 | Hashtag Generator | `/hashtag-generator/` | Platform-tailored hashtag sets from a caption (Gemini, with a deterministic fallback), shown in a modal with copy buttons and a CTA | name + email |
-| Fitness Challenge Generator for Coaches & Gyms | `/fitness-challenge-generator/` | Same single-screen design as the Hashtag Generator (dropdowns + name/email) → ready-to-run client challenge framework in the results modal, with a branded PDF download and a 30-day-trial CTA | name + email (selections too once its form has the fields) |
+| Fitness Challenge Generator for Coaches & Gyms | `/fitness-challenge-generator/` | Same single-screen design as the Hashtag Generator (dropdowns + name/email) → ready-to-run client challenge framework in the results modal (Gemini with a deterministic fallback), with a branded PDF download and a 30-day-trial CTA | name + email (selections too once its form has the fields) |
+| Fitness Recipe Generator for Coaches & Gyms | `/recipe-generator/` | Same design → three distinct, goal-aligned recipes that honour every dietary restriction and the coach's notes (Gemini with a 40-recipe library as fallback), approximate nutrition, coach notes, a logo-branded PDF, disclaimer and a free-trial CTA | name + email (selections too once its form has the fields) |
 
 **Stack:** React 19 · TypeScript · Tailwind CSS v4 · Vite (multi-page) ·
-jsPDF (client-side PDF) · two Vercel serverless routes: `api/track.ts`
-(HubSpot lead capture, shared by all tools) and `api/generate.ts` (Gemini
-hashtag generation).
+jsPDF (client-side PDF) · two Vercel serverless routes shared by every tool:
+`api/track.ts` (HubSpot lead capture) and `api/generate.ts` (Gemini
+generation for hashtags, challenges and recipes; each tool keeps a
+deterministic engine as fallback so it works without a key).
+
+Every tool uses the same shell: 536 px max width, `max-w-[536px] mx-auto
+p-4` wrapper, white card with soft shadow, 40 px inputs, 46 px primary
+button, 13-14 px body text, 14 px bold orange centred header, 580 px iframe
+fallback height with iframe-resizer auto-height, FitBudd orange / teal /
+light-teal tint. Any list with more than five options is a dropdown.
 
 ## Commands
 
 ```bash
 npm install
-npm run dev       # http://localhost:5173/, index, /hashtag-generator/, /fitness-challenge-generator/
+npm run dev       # http://localhost:5173/ : index, /hashtag-generator/, /fitness-challenge-generator/, /recipe-generator/
                   # /api/* is served too (copy .env.example → .env). Tracking is skipped in dev
                   # unless VITE_TRACK_IN_DEV=true, every event is a real HubSpot submission.
 npm run build     # type-check (src + api) + production build → dist/
@@ -81,6 +89,7 @@ HUBSPOT_PORTAL_ID                             optional, override the portal
 HUBSPOT_FORM_ID                               optional, overrides every tool's default form
 HUBSPOT_FORM_ID_HASHTAG_GENERATOR             optional, per-tool form
 HUBSPOT_FORM_ID_FITNESS_CHALLENGE_GENERATOR   optional, per-tool form
+HUBSPOT_FORM_ID_RECIPE_GENERATOR              optional, per-tool form (defaults to the hashtag form until one is created)
 HUBSPOT_PRIVATE_APP_TOKEN                     optional, authenticated secure-submit endpoint
 VITE_TRACK_IN_DEV                             dev only, 'true' sends events from `npm run dev`
 ```
@@ -96,6 +105,13 @@ What each tool sends:
   `page_url`, `submitted_at`. Then `pdf_download` (`pdf_downloaded`,
   `pdf_downloaded_at`, `challenge_name`) and `cta_click` (`cta_clicked`,
   `cta_text`, `cta_url`, `cta_clicked_at`), each with the email.
+- **Recipe Generator**, `lead` (on Generate Recipes): `email`, `firstname`,
+  `client_goal`, `preferred_protein`, `dietary_preference`, `meal_type`,
+  `cooking_time`, `notes`, `generated_recipes`, `tool_source`, `campaign`
+  (`lead_magnet`), `cta_destination` (`fitbudd_self_signup`), `page_url`,
+  `submitted_at`; then `pdf_download` and `cta_click` with the email. Until a
+  dedicated form exists it posts to the Hashtag Generator's form with
+  `pageName` "Recipe Generator".
 
 HubSpot rejects a whole submission if it names a field the form does not
 define, so the route reads the form's public definition, sends only the
@@ -124,11 +140,12 @@ in a centered modal with per-platform tips, per-tag and per-platform copy,
 Copy All, Regenerate and the FitBudd CTA
 (`https://dashboard.fitbudd.com/signup?utm_source=hashtag_generator&utm_medium=tool_cta&utm_campaign=lead_conversion`).
 
-### AI generation (Gemini)
+### AI generation (Gemini, shared by all three tools)
 
-When `GEMINI_API_KEY` is set, Generate calls `/api/generate`
-(`api/generate.ts`), which asks Google Gemini for caption-specific,
-per-platform hashtags in a fixed JSON schema. A free Google AI Studio key
+When a Gemini key is set, every tool's Generate button calls `/api/generate`
+(`api/generate.ts`) with `tool: 'hashtags' | 'challenge' | 'recipes'`; the
+route holds one prompt and one JSON schema per tool and the key never leaves
+the server. For hashtags it asks for caption-specific, per-platform tags. A free Google AI Studio key
 (https://aistudio.google.com/apikey) is enough. `aiHashtags.ts` re-applies
 the built-in engine's rules to every tag (lowercase letters and digits only,
 spam tags dropped, no #fyp-style tags on LinkedIn / X / Facebook / Pinterest
@@ -139,10 +156,11 @@ silently falls back to the built-in engine. Regenerate sends the tags already
 shown so the next set is different.
 
 ```
-GEMINI_API_KEY   required for AI generation; without it the built-in engine is used.
-                 GOOGLE_API_KEY, GOOGLE_GENERATIVE_AI_API_KEY, GOOGLE_GEMINI_API_KEY,
-                 GEMINI_KEY and VITE_GEMINI_API_KEY are accepted too (first one set wins),
-                 so an existing Vercel variable works without renaming
+GEMINI_API_KEY   required for AI generation; without it each tool's built-in engine is used.
+                 geminiapi, GOOGLE_API_KEY, GOOGLE_GENERATIVE_AI_API_KEY, GOOGLE_GEMINI_API_KEY,
+                 GEMINI_KEY, VITE_GEMINI_API_KEY and any name that looks like a Gemini/Google
+                 API key (case-insensitive) are accepted too, so an existing Vercel variable
+                 works without renaming
 GEMINI_MODEL     optional, defaults to gemini-3.5-flash-lite (fast, generous free quota);
                  gemini-3.8-flash is the higher-quality free alternative
 ```
@@ -188,8 +206,45 @@ progress tracking, coaching notes and reusable client instructions, a
   daily rules, weekly plan, client instructions, progress tracking, a
   day-by-day check-in grid, coach notes, optional scoring. FitBudd orange as
   the only accent, no sales copy, file name `<challenge-name>.pdf`.
+- Generation is Gemini-first (`aiChallenge.ts`): the model's framework is
+  checked for completeness, matching weekly-theme count and the
+  no-programming rule, then falls back to the deterministic engine in whole
+  or in part. Regenerate asks for a different framework. A disclaimer sits
+  under the results and at the end of the PDF.
 - Nothing is emailed by the tool itself; a HubSpot workflow on the form can
   send a follow-up to the captured email if wanted.
+
+## Fitness Recipe Generator for Coaches & Gyms
+
+Same shell and design: Client Goal (dropdown) and Meal Type (multi-select)
+on one row, Preferred Protein (multi-select, Eggs and Dairy separate,
+Seafood beside Fish) and Dietary Preference (multi-select, optional) on the
+next, Cooking Time as four chips, an optional Notes textarea, name and email,
+then Generate Recipes. No serving-size field. Results open in the shared
+modal: three recipe cards (name, meal type, time, approximate calories and
+macros, goal alignment, description, ingredients and steps, coach note),
+Download PDF, "Regenerate with different recipes", a disclaimer, and the CTA
+("Turn Recipes Into a Scalable Coaching Experience", `Start Free Trial`,
+`utm_source=recipe_generator`).
+
+- Gemini-first (`aiRecipes.ts`): the prompt treats every dietary requirement
+  and every dislike, allergy or intolerance in the notes as a hard
+  constraint, asks for distinct recipes covering the requested meal types
+  within the time limit, and sends previously shown names on Regenerate.
+  Each returned recipe is checked (`dietViolation`: vegetarian / vegan /
+  dairy-free / gluten-free keywords plus carb and protein limits for
+  low-carb, keto and high-protein; the notes' disliked terms; the time
+  limit; hype wording) and anything that fails is replaced from the
+  built-in library.
+- `generateRecipes.ts`: a 40-recipe library filtered by protein, diet, meal
+  type and time and ranked by goal fit. Dietary needs and dislikes are never
+  relaxed; protein preference, time and meal type relax in that order and
+  the coach is told when they do. Regenerate pushes already-shown recipes to
+  the back. The library is verified against the same validator in tests.
+- `generatePdf.ts`: FitBudd logo (base64 PNG in `src/shared/logo.ts`,
+  rendered from the site's SVG) in the header and footer of every page,
+  overview, recipe cards, ingredients, method, goal alignment, nutrition,
+  coach notes and the disclaimer; file name `fitbudd-recipe-generator.pdf`.
 
 ## Structure
 
@@ -197,15 +252,19 @@ progress tracking, coaching notes and reusable client instructions, a
 index.html                         internal index (noindex) → src/hub
 hashtag-generator/index.html       tool page (iframe-resizer child)
 fitness-challenge-generator/index.html
+recipe-generator/index.html
 api/
   track.ts                         shared HubSpot route: per-tool form + fields
-  generate.ts                      Gemini route for the Hashtag Generator
+  generate.ts                      shared Gemini route: hashtags, challenge, recipes
 src/
   shared/
     index.css                      Tailwind theme (FitBudd colours) + iframe rules
     tools.ts                       tool registry + Webflow embed snippet
+    logo.ts                        FitBudd logo as base64 PNG (for PDFs)
+    disclaimers.ts                 recipe + challenge disclaimers
     components/                    SelectDropdown, MultiSelectDropdown, MultiSelectChips
-                                   (≤5 options only), ToolModal, CTASection, HashMark, ToolMark
+                                   (≤5 options only), ToolModal, PdfDownloadButton,
+                                   CTASection, HashMark, ToolMark
     lib/tracking.ts                postEvent, email validation, trial URL
     lib/copy.ts                    clipboard helper with iframe fallback
   hub/                             index page
@@ -213,8 +272,11 @@ src/
                                    generateHashtags, aiHashtags, tracking, types
   tools/fitness-challenge-generator/
                                    FitnessChallengeGenerator (form), ChallengeModal,
-                                   ChallengePreview, PDFDownloadButton, generateChallenge,
+                                   ChallengePreview, aiChallenge, generateChallenge,
                                    generatePdf, tracking, types
+  tools/recipe-generator/          RecipeGenerator (form), RecipeModal, RecipeCard,
+                                   aiRecipes, generateRecipes (library), generatePdf,
+                                   tracking, types
 vite.config.ts                     multi-page build + dev middleware serving api/*.ts
 vercel.json                        30 s maxDuration for api/generate.ts
 .env.example                       every env var, documented

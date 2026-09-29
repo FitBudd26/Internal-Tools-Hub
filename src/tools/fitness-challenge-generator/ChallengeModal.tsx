@@ -1,25 +1,31 @@
 import { CTASection } from '../../shared/components/CTASection';
+import { PdfDownloadButton } from '../../shared/components/PdfDownloadButton';
 import { ToolMark } from '../../shared/components/ToolMark';
 import { ToolModal } from '../../shared/components/ToolModal';
+import { CHALLENGE_DISCLAIMER } from '../../shared/disclaimers';
 import { ChallengePreview } from './ChallengePreview';
-import { PDFDownloadButton } from './PDFDownloadButton';
+import { downloadChallengePdf } from './generatePdf';
 import { CTA_TEXT, CTA_URL } from './tracking';
 import type { Challenge } from './types';
 
 interface ChallengeModalProps {
   open: boolean;
   challenge: Challenge | null;
+  regenerating: boolean;
   onClose: () => void;
+  onRegenerate: () => void;
   onCreateAnother: () => void;
   onPdfDownloaded: (fileName: string) => void;
   onCtaClick: () => void;
 }
 
-/** Results in the same modal as the Hashtag Generator: preview, PDF, CTA. */
+/** Results in the same modal as the other tools: preview, PDF, regenerate, CTA. */
 export function ChallengeModal({
   open,
   challenge,
+  regenerating,
   onClose,
+  onRegenerate,
   onCreateAnother,
   onPdfDownloaded,
   onCtaClick,
@@ -46,18 +52,37 @@ export function ChallengeModal({
     >
       <ChallengePreview challenge={challenge} />
 
-      <PDFDownloadButton challenge={challenge} onDownloaded={onPdfDownloaded} />
+      <PdfDownloadButton
+        onDownload={() => downloadChallengePdf(challenge)}
+        onDownloaded={onPdfDownloaded}
+        ariaLabel={`Download the ${challenge.challengeName} as a PDF`}
+      />
       <p className="-mt-1 text-center text-[11px] text-gray-400">
         Client-ready, branding-neutral PDF with a day-by-day check-in tracker
       </p>
 
-      <button
-        type="button"
-        onClick={onCreateAnother}
-        className="mx-auto rounded text-[13px] font-medium text-gray-500 transition-colors hover:text-gray-800 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fb-orange"
-      >
-        ↻ Create another challenge
-      </button>
+      <div className="flex items-center justify-center gap-4">
+        <button
+          type="button"
+          onClick={onRegenerate}
+          disabled={regenerating}
+          aria-busy={regenerating}
+          className="rounded text-[13px] font-medium text-gray-500 transition-colors hover:text-gray-800 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fb-orange disabled:cursor-wait disabled:opacity-60 disabled:hover:no-underline"
+        >
+          {regenerating ? 'Regenerating…' : '↻ Regenerate'}
+        </button>
+        <button
+          type="button"
+          onClick={onCreateAnother}
+          className="rounded text-[13px] font-medium text-gray-500 transition-colors hover:text-gray-800 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fb-orange"
+        >
+          Create another challenge
+        </button>
+      </div>
+
+      <p className="border-t border-gray-100 pt-2 text-[11px] leading-snug text-gray-400">
+        Disclaimer: {CHALLENGE_DISCLAIMER}
+      </p>
     </ToolModal>
   );
 }

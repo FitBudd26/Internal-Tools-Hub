@@ -89,6 +89,42 @@ const TOOLS: Record<string, ToolConfig> = {
       },
     },
   },
+  'recipe-generator': {
+    pageName: 'Recipe Generator',
+    formIdEnv: 'HUBSPOT_FORM_ID_RECIPE_GENERATOR',
+    // No dedicated form yet: shares the Hashtag Generator's form (email + firstname)
+    // until one is provided; pageName keeps the submissions distinguishable.
+    defaultFormId: 'e7410680-1ea2-4f36-8f94-bde4cd94aa62',
+    events: {
+      lead: {
+        primary: true,
+        fields: [
+          'email',
+          'firstname',
+          'client_goal',
+          'preferred_protein',
+          'dietary_preference',
+          'meal_type',
+          'cooking_time',
+          'notes',
+          'generated_recipes',
+          'tool_source',
+          'campaign',
+          'cta_destination',
+          'page_url',
+          'submitted_at',
+        ],
+      },
+      pdf_download: {
+        primary: false,
+        fields: ['email', 'pdf_downloaded', 'pdf_downloaded_at', 'generated_recipes', 'tool_source', 'page_url'],
+      },
+      cta_click: {
+        primary: false,
+        fields: ['email', 'cta_clicked', 'cta_text', 'cta_url', 'cta_clicked_at', 'tool_source', 'page_url'],
+      },
+    },
+  },
 };
 
 function toolFields(cfg: ToolConfig): string[] {

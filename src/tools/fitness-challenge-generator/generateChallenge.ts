@@ -134,7 +134,35 @@ function joinClauses(parts: string[]): string {
 const present = <T,>(items: (T | null | false | undefined)[]): T[] =>
   items.filter((x): x is T => Boolean(x));
 
-function weeklyThemes(days: number, primary: ChallengeType, community: boolean, mixed: boolean): WeeklyTheme[] {
+/** How many weekly themes a challenge of this length has. */
+export function weeksFor(days: number): number {
+  return days <= 7 ? 1 : days <= 14 ? 2 : days <= 21 ? 3 : 4;
+}
+
+/** Workout programming the generator must never contain (also used to gate model output). */
+export const PROGRAMMING_RE = /\b(reps?|sets|squats?|push-?ups?|burpees?|deadlifts?|bench press|lunges?|pull-?ups?|planks?|lose weight fast|burn fat|miracle)\b/i;
+
+/** Ordered PDF sections built from the framework fields (shared by both generation paths). */
+export function buildPdfSections(c: Omit<Challenge, 'pdfSections'>): PdfSection[] {
+  const focus = c.subtitle.replace(/^\d+-Day\s+/i, '').replace(/\s+Challenge for .*$/i, '');
+  const overview = `A ${c.durationDays}-day ${focus.toLowerCase()} challenge for ${c.designedFor.toLowerCase()}: ${c.dailyRules.length} daily non-negotiables, ${c.weeklyThemes.length === 1 ? 'one theme' : `${c.weeklyThemes.length} weekly themes`}, an optional scoring system and a day-by-day check-in tracker. It layers on top of your existing training program, with no programming changes required.`;
+  return [
+    { heading: 'Challenge Overview', paragraphs: [overview] },
+    { heading: 'Designed For', paragraphs: [c.designedFor, `Level: ${c.level}`] },
+    { heading: 'Duration', paragraphs: [c.duration] },
+    { heading: 'Objective', paragraphs: [c.objective] },
+    { heading: 'How It Works', paragraphs: [c.howItWorks, 'Participants must complete all required actions to mark a day as complete.'] },
+    { heading: 'Daily Challenge Rules', numbered: c.dailyRules },
+    { heading: 'Weekly Plan', bullets: c.weeklyThemes.map((t) => `${t.label}: ${t.name}. Focus: ${t.focus}. Coach tip: ${t.coachTip}`) },
+    { heading: 'Client Instructions', paragraphs: c.clientInstructions },
+    { heading: 'Progress Tracking', bullets: c.progressTracking },
+    { heading: 'Check-in Tracker', tracker: true },
+    { heading: 'Coach Notes', bullets: c.coachingNotes },
+    { heading: 'Scoring System (Optional)', bullets: c.scoringSystem },
+  ];
+}
+
+export function weeklyThemes(days: number, primary: ChallengeType, community: boolean, mixed: boolean): WeeklyTheme[] {
   const baseline = {
     name: 'Consistency & Baseline',
     focus: 'Showing up daily and logging it',
@@ -310,30 +338,7 @@ export function generateChallenge(input: ChallengeInput): Challenge {
   const level = input.fitnessLevels.join(', ') || 'All levels';
   const duration = `${days} Days`;
 
-  const overview = `A ${days}-day ${focus.toLowerCase()} challenge for ${forLabel.toLowerCase()}: ${dailyRules.length} daily non-negotiables, ${themes.length === 1 ? 'one theme' : `${themes.length} weekly themes`}, an optional scoring system and a day-by-day check-in tracker. It layers on top of your existing training program, with no programming changes required.`;
-
-  const pdfSections: PdfSection[] = [
-    { heading: 'Challenge Overview', paragraphs: [overview] },
-    { heading: 'Designed For', paragraphs: [designedFor, `Level: ${level}`] },
-    { heading: 'Duration', paragraphs: [duration] },
-    { heading: 'Objective', paragraphs: [objective] },
-    {
-      heading: 'How It Works',
-      paragraphs: [howItWorks, 'Participants must complete all required actions to mark a day as complete.'],
-    },
-    { heading: 'Daily Challenge Rules', numbered: dailyRules },
-    {
-      heading: 'Weekly Plan',
-      bullets: themes.map((t) => `${t.label}: ${t.name}. Focus: ${t.focus}. Coach tip: ${t.coachTip}`),
-    },
-    { heading: 'Client Instructions', paragraphs: clientInstructions },
-    { heading: 'Progress Tracking', bullets: progressTracking },
-    { heading: 'Check-in Tracker', tracker: true },
-    { heading: 'Coach Notes', bullets: coachingNotes },
-    { heading: 'Scoring System (Optional)', bullets: scoringSystem },
-  ];
-
-  return {
+  const core = {
     challengeName,
     subtitle,
     designedFor,
@@ -348,8 +353,8 @@ export function generateChallenge(input: ChallengeInput): Challenge {
     progressTracking,
     coachingNotes,
     clientInstructions,
-    pdfSections,
   };
+  return { ...core, pdfSections: buildPdfSections(core) };
 }
 
 /** `Metabolic Ignite Challenge` → `metabolic-ignite-challenge` (for file names). */

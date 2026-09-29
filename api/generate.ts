@@ -1,28 +1,33 @@
 /**
- * Vercel serverless route: asks Google Gemini for caption-specific,
- * platform-grouped hashtags. The API key lives only in a server env var,
- * nothing Gemini-related ships in the frontend bundle:
+ * Vercel serverless route shared by every tool: asks Google Gemini for the
+ * tool's answer (hashtag sets, a challenge framework, or recipes) in a fixed
+ * JSON schema. The API key lives only in a server env var, never in the
+ * frontend bundle:
  *
- *   GEMINI_API_KEY   required, without it this route answers 503 and the
- *                    client quietly uses the built-in deterministic engine.
- *                    GOOGLE_API_KEY and the other names in KEY_ENV_NAMES are
+ *   GEMINI_API_KEY   required, without it this route answers 503 and each
+ *                    tool quietly uses its built-in engine. The other names
+ *                    in KEY_ENV_NAMES (e.g. geminiapi, GOOGLE_API_KEY) are
  *                    accepted too, so an existing Vercel variable just works.
  *   GEMINI_MODEL     optional, defaults to gemini-3.5-flash-lite (free tier,
  *                    fast); gemini-3.8-flash is the higher-quality free option
  *
- * The client re-validates every tag the model returns (lowercase, banned
- * tags, per-platform limits, the caption's own tags), so this route only has
- * to return well-formed JSON. Any non-200 answer here makes the client fall
- * back to local generation, so users always get results.
+ * Request body: { tool: 'hashtags' | 'challenge' | 'recipes', ...input }.
+ * Each client re-validates what the model returns, so this route only has
+ * to return well-formed JSON. Any non-200 answer makes the client fall back
+ * to its local engine, so users always get results.
  */
 
 declare const process: { env: Record<string, string | undefined> };
 
 const DEFAULT_MODEL = 'gemini-3.5-flash-lite';
+const UPSTREAM_TIMEOUT_MS = 20_000;
 
 /** Env var names accepted for the Gemini key; the first one set wins. */
 const KEY_ENV_NAMES = [
   'GEMINI_API_KEY',
+  'geminiapi',
+  'GEMINIAPI',
+  'GEMINI_API',
   'GOOGLE_API_KEY',
   'GOOGLE_GENERATIVE_AI_API_KEY',
   'GOOGLE_GEMINI_API_KEY',
@@ -30,84 +35,25 @@ const KEY_ENV_NAMES = [
   'VITE_GEMINI_API_KEY',
 ];
 
+/** Exact names first, then any variable that looks like a Gemini/Google API key, whatever its casing. */
 function findKey(): { key: string | null; source: string | null } {
   for (const name of KEY_ENV_NAMES) {
     const value = process.env[name]?.trim();
     if (value) return { key: value, source: name };
   }
+  const looksLikeKey = /^(gemini_?api(_?key)?|google_?(gemini_?|generative_?ai_?)?api_?key)$/i;
+  for (const [name, value] of Object.entries(process.env)) {
+    if (looksLikeKey.test(name) && value?.trim()) return { key: value.trim(), source: name };
+  }
   return { key: null, source: null };
 }
-const UPSTREAM_TIMEOUT_MS = 12_000;
 
-const PLATFORMS = [
-  'Instagram',
-  'TikTok',
-  'Twitter/X',
-  'LinkedIn',
-  'YouTube',
-  'Facebook',
-  'Pinterest',
-  'Threads',
-] as const;
-type Platform = (typeof PLATFORMS)[number];
+/* -------------------------------- helpers -------------------------------- */
 
-/** Per-platform brief, mirroring the product spec and the local engine's limits. */
-const GUIDANCE: Record<Platform, string> = {
-  Instagram:
-    '12-20 tags mixing broad, niche, community and intent-based tags; never only mega tags',
-  TikTok: '5-8 short tags mixing niche, content-format and trend-style tags',
-  'Twitter/X': '2-4 minimal, context-driven tags',
-  LinkedIn: '3-6 clean, professional, industry-specific tags; no slang or viral bait',
-  YouTube: '5-10 searchable tags: topic, video category and phrases people search',
-  Facebook: '3-6 clean category and community tags',
-  Pinterest: '8-15 evergreen, searchable discovery tags with niche variations',
-  Threads: '2-5 conversational, minimal tags',
-};
-
-const RESPONSE_SCHEMA = {
-  type: 'OBJECT',
-  properties: {
-    groups: {
-      type: 'ARRAY',
-      items: {
-        type: 'OBJECT',
-        properties: {
-          platform: { type: 'STRING' },
-          hashtags: { type: 'ARRAY', items: { type: 'STRING' } },
-        },
-        required: ['platform', 'hashtags'],
-      },
-    },
-  },
-  required: ['groups'],
-};
-
-const PLATFORM_KEYS = new Map<string, Platform>(
-  PLATFORMS.map((p) => [p.toLowerCase().replace(/[^a-z]/g, ''), p] as const),
-);
-PLATFORM_KEYS.set('x', 'Twitter/X');
-PLATFORM_KEYS.set('twitter', 'Twitter/X');
-PLATFORM_KEYS.set('xtwitter', 'Twitter/X');
-
-interface GenerateRequest {
-  method?: string;
-  body?: unknown;
-}
-
-interface GenerateResponse {
-  setHeader(name: string, value: string): unknown;
-  status(code: number): { json(body: unknown): void; end(): void };
-}
-
-interface Input {
-  caption: string;
-  topic: string;
-  postType: string;
-  tones: string[];
-  platforms: Platform[];
-  /** Tags already shown to the user (Regenerate), the model is told to avoid them. */
-  avoid: string[];
-}
+const STYLE_RULES = [
+  'Never use em dashes or en dashes anywhere in the text; use commas, colons or periods, and plain hyphens for numeric ranges (20-30).',
+  'Professional, clear, coach-facing tone. No consumer hype, no medical claims, no promises of results.',
+];
 
 function safeJson(s: string): unknown {
   try {
@@ -117,9 +63,8 @@ function safeJson(s: string): unknown {
   }
 }
 
-function matchPlatform(raw: unknown): Platform | null {
-  if (typeof raw !== 'string') return null;
-  return PLATFORM_KEYS.get(raw.toLowerCase().replace(/[^a-z]/g, '')) ?? null;
+function str(v: unknown, max: number): string {
+  return typeof v === 'string' ? v.trim().slice(0, max) : '';
 }
 
 function strings(v: unknown, maxItems: number, maxLen: number): string[] {
@@ -131,59 +76,347 @@ function strings(v: unknown, maxItems: number, maxLen: number): string[] {
     .slice(0, maxItems);
 }
 
-function parseInput(body: unknown): Input | null {
-  const b = typeof body === 'string' ? safeJson(body) : body;
-  if (!b || typeof b !== 'object') return null;
-  const o = b as Record<string, unknown>;
-  const caption = typeof o.caption === 'string' ? o.caption.trim().slice(0, 2000) : '';
-  const platforms = Array.isArray(o.platforms)
-    ? [...new Set(o.platforms.map(matchPlatform).filter((p): p is Platform => p !== null))]
-    : [];
-  if (!caption || platforms.length === 0) return null;
-  return {
-    caption,
-    topic: typeof o.topic === 'string' ? o.topic.trim().slice(0, 120) : '',
-    postType: typeof o.postType === 'string' ? o.postType.trim().slice(0, 40) : '',
-    tones: strings(o.tones, 9, 30),
-    platforms,
-    avoid: strings(o.avoid, 150, 40),
-  };
-}
-
-function buildPrompt(input: Input): string {
-  const lines = [
-    'You write hashtags for one social media post. Reply with JSON only, matching this shape: {"groups":[{"platform":"<name>","hashtags":["tag","tag"]}]}.',
-    '',
-    `Caption: """${input.caption}"""`,
-    `Topic / niche: ${input.topic || 'not given, infer it from the caption'}`,
-    `Post type: ${input.postType || 'not given'}`,
-    `Tone / goal: ${input.tones.length ? input.tones.join(', ') : 'not given'}`,
-    '',
-    'Platforms to cover (use these exact names, include every one) and what each needs:',
-    ...input.platforms.map((p) => `- ${p}: ${GUIDANCE[p]}`),
-    '',
-    'Rules:',
-    '- Every hashtag must fit this specific caption, topic and post type. Prefer niche and intent tags over generic filler; never add unrelated trending tags just for reach.',
-    "- Follow the caption's actual subject; do not assume a niche it does not mention.",
-    '- Write each hashtag as lowercase letters and digits only, 3-28 characters, without the # sign, spaces, punctuation or emoji.',
-    '- No engagement-bait or spam tags (follow4follow, like4like, followme, followback, f4f, l4l and similar).',
-    '- No fyp / foryou / viral style tags on LinkedIn, Twitter/X, Facebook, Pinterest or Threads.',
-    '- Give each platform its own angle: a hashtag may appear on at most three platforms.',
-    '- Do not repeat hashtags that already appear in the caption.',
-  ];
-  if (input.avoid.length) {
-    lines.push(
-      `- These were already suggested; return different ones: ${input.avoid.join(', ')}`,
-    );
-  }
-  return lines.join('\n');
+function num(v: unknown, min: number, max: number): number | null {
+  const n = typeof v === 'number' ? v : typeof v === 'string' ? Number(v) : NaN;
+  return Number.isFinite(n) && n >= min && n <= max ? Math.round(n) : null;
 }
 
 function extractText(data: unknown): string {
-  const d = data as {
-    candidates?: { content?: { parts?: { text?: string }[] } }[];
-  };
+  const d = data as { candidates?: { content?: { parts?: { text?: string }[] } }[] };
   return (d.candidates?.[0]?.content?.parts ?? []).map((p) => p.text ?? '').join('');
+}
+
+interface ToolSpec {
+  parse(body: Record<string, unknown>): Record<string, unknown> | null;
+  prompt(input: Record<string, unknown>): string;
+  schema: unknown;
+  /** Turn the model's parsed JSON into the response payload, or null when unusable. */
+  normalize(parsed: unknown): Record<string, unknown> | null;
+  maxOutputTokens: number;
+}
+
+/* -------------------------------- hashtags -------------------------------- */
+
+const PLATFORMS = ['Instagram', 'TikTok', 'Twitter/X', 'LinkedIn', 'YouTube', 'Facebook', 'Pinterest', 'Threads'] as const;
+type Platform = (typeof PLATFORMS)[number];
+
+const PLATFORM_GUIDANCE: Record<Platform, string> = {
+  Instagram: '12-20 tags mixing broad, niche, community and intent-based tags; never only mega tags',
+  TikTok: '5-8 short tags mixing niche, content-format and trend-style tags',
+  'Twitter/X': '2-4 minimal, context-driven tags',
+  LinkedIn: '3-6 clean, professional, industry-specific tags; no slang or viral bait',
+  YouTube: '5-10 searchable tags: topic, video category and phrases people search',
+  Facebook: '3-6 clean category and community tags',
+  Pinterest: '8-15 evergreen, searchable discovery tags with niche variations',
+  Threads: '2-5 conversational, minimal tags',
+};
+
+const PLATFORM_KEYS = new Map<string, Platform>(
+  PLATFORMS.map((p) => [p.toLowerCase().replace(/[^a-z]/g, ''), p] as const),
+);
+PLATFORM_KEYS.set('x', 'Twitter/X');
+PLATFORM_KEYS.set('twitter', 'Twitter/X');
+PLATFORM_KEYS.set('xtwitter', 'Twitter/X');
+
+function matchPlatform(raw: unknown): Platform | null {
+  if (typeof raw !== 'string') return null;
+  return PLATFORM_KEYS.get(raw.toLowerCase().replace(/[^a-z]/g, '')) ?? null;
+}
+
+const hashtags: ToolSpec = {
+  maxOutputTokens: 4096,
+  parse(o) {
+    const caption = str(o.caption, 2000);
+    const platforms = Array.isArray(o.platforms)
+      ? [...new Set(o.platforms.map(matchPlatform).filter((p): p is Platform => p !== null))]
+      : [];
+    if (!caption || platforms.length === 0) return null;
+    return {
+      caption,
+      topic: str(o.topic, 120),
+      postType: str(o.postType, 40),
+      tones: strings(o.tones, 9, 30),
+      platforms,
+      avoid: strings(o.avoid, 150, 40),
+    };
+  },
+  prompt(input) {
+    const i = input as { caption: string; topic: string; postType: string; tones: string[]; platforms: Platform[]; avoid: string[] };
+    const lines = [
+      'You write hashtags for one social media post. Reply with JSON only, matching this shape: {"groups":[{"platform":"<name>","hashtags":["tag","tag"]}]}.',
+      '',
+      `Caption: """${i.caption}"""`,
+      `Topic / niche: ${i.topic || 'not given, infer it from the caption'}`,
+      `Post type: ${i.postType || 'not given'}`,
+      `Tone / goal: ${i.tones.length ? i.tones.join(', ') : 'not given'}`,
+      '',
+      'Platforms to cover (use these exact names, include every one) and what each needs:',
+      ...i.platforms.map((p) => `- ${p}: ${PLATFORM_GUIDANCE[p]}`),
+      '',
+      'Rules:',
+      '- Every hashtag must fit this specific caption, topic and post type. Prefer niche and intent tags over generic filler; never add unrelated trending tags just for reach.',
+      "- Follow the caption's actual subject; do not assume a niche it does not mention.",
+      '- Write each hashtag as lowercase letters and digits only, 3-28 characters, without the # sign, spaces, punctuation or emoji.',
+      '- No engagement-bait or spam tags (follow4follow, like4like, followme, followback, f4f, l4l and similar).',
+      '- No fyp / foryou / viral style tags on LinkedIn, Twitter/X, Facebook, Pinterest or Threads.',
+      '- Give each platform its own angle: a hashtag may appear on at most three platforms.',
+      '- Do not repeat hashtags that already appear in the caption.',
+    ];
+    if (i.avoid.length) lines.push(`- These were already suggested; return different ones: ${i.avoid.join(', ')}`);
+    return lines.join('\n');
+  },
+  schema: {
+    type: 'OBJECT',
+    properties: {
+      groups: {
+        type: 'ARRAY',
+        items: {
+          type: 'OBJECT',
+          properties: { platform: { type: 'STRING' }, hashtags: { type: 'ARRAY', items: { type: 'STRING' } } },
+          required: ['platform', 'hashtags'],
+        },
+      },
+    },
+    required: ['groups'],
+  },
+  normalize(parsed) {
+    const raw = parsed && typeof parsed === 'object' ? (parsed as { groups?: unknown }).groups : undefined;
+    const seen = new Set<Platform>();
+    const groups: { platform: Platform; hashtags: string[] }[] = [];
+    for (const g of Array.isArray(raw) ? raw : []) {
+      if (!g || typeof g !== 'object') continue;
+      const platform = matchPlatform((g as { platform?: unknown }).platform);
+      const tags = strings((g as { hashtags?: unknown }).hashtags, 30, 40);
+      if (!platform || seen.has(platform) || tags.length === 0) continue;
+      seen.add(platform);
+      groups.push({ platform, hashtags: tags });
+    }
+    return groups.length ? { groups } : null;
+  },
+};
+
+/* ------------------------------- challenge -------------------------------- */
+
+const challenge: ToolSpec = {
+  maxOutputTokens: 6144,
+  parse(o) {
+    const challengeTypes = strings(o.challengeTypes, 9, 40);
+    if (!challengeTypes.length) return null;
+    return {
+      challengeTypes,
+      audienceTypes: strings(o.audienceTypes, 7, 40),
+      fitnessLevels: strings(o.fitnessLevels, 4, 20),
+      days: num(o.days, 7, 30) ?? 28,
+      equipment: strings(o.equipment, 8, 30),
+      measurements: strings(o.measurements, 4, 30),
+      variant: num(o.variant, 0, 99) ?? 0,
+      avoidNames: strings(o.avoidNames, 10, 80),
+    };
+  },
+  prompt(input) {
+    const i = input as { challengeTypes: string[]; audienceTypes: string[]; fitnessLevels: string[]; days: number; equipment: string[]; measurements: string[]; variant: number; avoidNames: string[] };
+    const weeks = i.days <= 7 ? 1 : i.days <= 14 ? 2 : i.days <= 21 ? 3 : 4;
+    const labels = weeks === 1 ? `"Days 1-${i.days}"` : Array.from({ length: weeks }, (_, k) => (k === 3 && i.days > 28 ? `"Days 22-${i.days}"` : `"Week ${k + 1}"`)).join(', ');
+    const noKit = i.equipment.length > 0 && i.equipment.every((e) => e === 'No Equipment' || e === 'Bodyweight Only');
+    const mixed = i.fitnessLevels.includes('Mixed Levels') || i.fitnessLevels.length > 1;
+    return [
+      'You design client challenge frameworks for fitness professionals (coaches, trainers, gym and studio owners). Reply with JSON only, matching the schema.',
+      '',
+      `Challenge type(s): ${i.challengeTypes.join(', ')}`,
+      `Audience: ${i.audienceTypes.join(', ') || 'coaching clients'}`,
+      `Fitness level(s): ${i.fitnessLevels.join(', ') || 'mixed'}`,
+      `Duration: ${i.days} days`,
+      `Equipment available: ${i.equipment.join(', ') || 'unspecified'}`,
+      `Measurement units the coach uses: ${i.measurements.join(', ') || 'unspecified'}`,
+      `Variation seed: ${i.variant} (make this framework read differently from other seeds for the same inputs).`,
+      '',
+      'What a challenge is here: a set of behavioural rules, daily compliance tasks, targets, accountability mechanics, weekly themes and an optional scoring system that layers on top of the coach\'s existing training program.',
+      'Hard rules:',
+      '- Never prescribe exercises, sets, reps, loads, daily workouts or exercise-by-exercise plans. Training sessions are referenced only as "complete the assigned session".',
+      '- Coach-facing, business-use language (clients, members, retention, engagement, deployment). No consumer transformation claims, no "lose weight fast" style copy, no medical claims.',
+      '- challengeName: professional and brand-ready, something a gym or coach would actually run (examples of the style: Metabolic Ignite Challenge, Consistency Builder Challenge, The 28-Day Accountability Sprint, Recovery & Readiness Challenge).',
+      `- subtitle: one line, e.g. "${i.days}-Day <focus> Challenge for <audience>".`,
+      '- dailyRules: exactly 4 rules. Each has a short title and 2-4 detail bullets. Rule 1 is always completing the assigned training session (workout-agnostic, planned rest days count). Rule 2 is a daily movement target (steps or minutes). Rule 3 is a habit check tied to the challenge type (nutrition, sleep, hydration, mobility, community, etc.). Rule 4 is an accountability check-in (log completion, rate energy 1-10).',
+      `- weeklyThemes: exactly ${weeks} entries with labels ${labels}, each with name, focus and coachTip.`,
+      '- scoringSystem: 3-5 bullets (daily completion = 1 point, perfect week bonus, streak bonus, group option).',
+      '- progressTracking: 4-8 bullets, using the coach\'s units where weight or measurements are relevant.',
+      '- coachingNotes: 4-8 bullets on deploying and scaling the challenge.',
+      '- clientInstructions: 4-6 short participant-facing sentences a coach can paste into an app or message.',
+      ...(mixed ? ['- Fitness levels are mixed: every rule must be scalable; no intensity-specific requirements; effort cues relative (RPE), never absolute loads.'] : []),
+      ...(noKit ? ['- No equipment is available: do not mention loads, machines or any equipment-dependent tracking.'] : []),
+      ...(i.challengeTypes.includes('Community Engagement') || i.audienceTypes.includes('Online Community') ? ['- Emphasise leaderboards, visible check-ins, group participation and recognition.'] : []),
+      ...(i.audienceTypes.includes('Corporate / Workplace Groups') ? ['- Corporate audience: emphasise simple participation, low equipment needs, compliance tracking and team completion rates.'] : []),
+      ...(i.audienceTypes.includes('Social Media Audience') ? ['- Social audience: emphasise public challenge prompts, daily check-ins, shareable completion tasks and lead-generation use.'] : []),
+      ...(i.avoidNames.length ? [`- Do not reuse these challenge names: ${i.avoidNames.join(', ')}.`] : []),
+      ...STYLE_RULES.map((r) => `- ${r}`),
+    ].join('\n');
+  },
+  schema: {
+    type: 'OBJECT',
+    properties: {
+      challengeName: { type: 'STRING' },
+      subtitle: { type: 'STRING' },
+      objective: { type: 'STRING' },
+      howItWorks: { type: 'STRING' },
+      dailyRules: {
+        type: 'ARRAY',
+        items: { type: 'OBJECT', properties: { title: { type: 'STRING' }, details: { type: 'ARRAY', items: { type: 'STRING' } } }, required: ['title', 'details'] },
+      },
+      weeklyThemes: {
+        type: 'ARRAY',
+        items: { type: 'OBJECT', properties: { label: { type: 'STRING' }, name: { type: 'STRING' }, focus: { type: 'STRING' }, coachTip: { type: 'STRING' } }, required: ['label', 'name', 'focus', 'coachTip'] },
+      },
+      scoringSystem: { type: 'ARRAY', items: { type: 'STRING' } },
+      progressTracking: { type: 'ARRAY', items: { type: 'STRING' } },
+      coachingNotes: { type: 'ARRAY', items: { type: 'STRING' } },
+      clientInstructions: { type: 'ARRAY', items: { type: 'STRING' } },
+    },
+    required: ['challengeName', 'subtitle', 'objective', 'howItWorks', 'dailyRules', 'weeklyThemes', 'scoringSystem', 'progressTracking', 'coachingNotes', 'clientInstructions'],
+  },
+  normalize(parsed) {
+    if (!parsed || typeof parsed !== 'object') return null;
+    const o = parsed as Record<string, unknown>;
+    const rules = (Array.isArray(o.dailyRules) ? o.dailyRules : [])
+      .map((r) => ({ title: str((r as { title?: unknown })?.title, 120), details: strings((r as { details?: unknown })?.details, 5, 200) }))
+      .filter((r) => r.title && r.details.length)
+      .slice(0, 5);
+    const themes = (Array.isArray(o.weeklyThemes) ? o.weeklyThemes : [])
+      .map((t) => {
+        const w = t as Record<string, unknown>;
+        return { label: str(w?.label, 30), name: str(w?.name, 80), focus: str(w?.focus, 160), coachTip: str(w?.coachTip, 240) };
+      })
+      .filter((t) => t.label && t.name && t.focus && t.coachTip)
+      .slice(0, 5);
+    const out = {
+      challengeName: str(o.challengeName, 80),
+      subtitle: str(o.subtitle, 160),
+      objective: str(o.objective, 600),
+      howItWorks: str(o.howItWorks, 600),
+      dailyRules: rules,
+      weeklyThemes: themes,
+      scoringSystem: strings(o.scoringSystem, 6, 200),
+      progressTracking: strings(o.progressTracking, 10, 200),
+      coachingNotes: strings(o.coachingNotes, 10, 240),
+      clientInstructions: strings(o.clientInstructions, 8, 300),
+    };
+    const ok = out.challengeName && out.subtitle && out.objective && out.howItWorks && rules.length >= 3 && themes.length >= 1 && out.scoringSystem.length >= 2 && out.progressTracking.length >= 3 && out.coachingNotes.length >= 3 && out.clientInstructions.length >= 3;
+    return ok ? { challenge: out } : null;
+  },
+};
+
+/* -------------------------------- recipes --------------------------------- */
+
+const recipes: ToolSpec = {
+  maxOutputTokens: 6144,
+  parse(o) {
+    const goal = str(o.goal, 40);
+    const mealTypes = strings(o.mealTypes, 7, 30);
+    if (!goal || !mealTypes.length) return null;
+    return {
+      goal,
+      proteins: strings(o.proteins, 13, 40),
+      diets: strings(o.diets, 9, 30),
+      mealTypes,
+      cookingTime: str(o.cookingTime, 30),
+      notes: str(o.notes, 600),
+      count: num(o.count, 1, 5) ?? 3,
+      variant: num(o.variant, 0, 99) ?? 0,
+      avoidNames: strings(o.avoidNames, 15, 80),
+    };
+  },
+  prompt(input) {
+    const i = input as { goal: string; proteins: string[]; diets: string[]; mealTypes: string[]; cookingTime: string; notes: string; count: number; variant: number; avoidNames: string[] };
+    const diets = i.diets.filter((d) => d !== 'No Restrictions');
+    const proteins = i.proteins.filter((p) => p !== 'No Preference');
+    const limit = /under (\d+)/i.exec(i.cookingTime)?.[1];
+    return [
+      'You create practical recipes that a fitness coach shares with clients. Reply with JSON only, matching the schema.',
+      '',
+      `Client goal: ${i.goal}`,
+      `Preferred proteins: ${proteins.length ? proteins.join(', ') : 'no preference'}`,
+      `Dietary requirements (HARD constraints; every recipe must satisfy ALL of them): ${diets.length ? diets.join(', ') : 'none'}`,
+      `Meal types requested: ${i.mealTypes.join(', ')}`,
+      `Cooking time: ${limit ? `total time must be under ${limit} minutes` : 'flexible'}`,
+      `Coach's notes about the client (treat any dislikes, allergies or intolerances as HARD exclusions): ${i.notes ? `"""${i.notes}"""` : 'none'}`,
+      `Variation seed: ${i.variant} (this set must feel different from other sets for the same inputs).`,
+      '',
+      `Return exactly ${i.count} recipes:`,
+      '- Distinct from each other: different main ingredient or cooking method, never two variations of the same dish.',
+      '- Cover each requested meal type at least once where possible; set mealType to one of the requested values exactly.',
+      '- Use the preferred proteins where they comply with the dietary requirements; if a preferred protein conflicts with a requirement (for example chicken with Vegan), skip that protein.',
+      '- Each recipe: a specific name, 5-9 ingredients with quantities for one serving, 3-6 short numbered steps, timeMinutes within the limit, approximate per-serving nutrition as whole numbers (calories, proteinG, carbsG, fatG; round figures, no false precision), goalAlignment (one sentence tying the ingredients or macros to the client goal), and coachingNote (one or two sentences on how a trainer uses this with clients).',
+      '- Everyday supermarket ingredients, simple technique, nothing exotic or complex.',
+      ...(i.avoidNames.length ? [`- Do not return these recipes or close variations of them: ${i.avoidNames.join(', ')}.`] : []),
+      ...STYLE_RULES.map((r) => `- ${r}`),
+      '- Nutrition is practical guidance, not a clinical prescription; never claim health outcomes.',
+    ].join('\n');
+  },
+  schema: {
+    type: 'OBJECT',
+    properties: {
+      recipes: {
+        type: 'ARRAY',
+        items: {
+          type: 'OBJECT',
+          properties: {
+            name: { type: 'STRING' },
+            mealType: { type: 'STRING' },
+            goalAlignment: { type: 'STRING' },
+            description: { type: 'STRING' },
+            ingredients: { type: 'ARRAY', items: { type: 'STRING' } },
+            steps: { type: 'ARRAY', items: { type: 'STRING' } },
+            timeMinutes: { type: 'INTEGER' },
+            nutrition: {
+              type: 'OBJECT',
+              properties: { calories: { type: 'INTEGER' }, proteinG: { type: 'INTEGER' }, carbsG: { type: 'INTEGER' }, fatG: { type: 'INTEGER' } },
+              required: ['calories', 'proteinG', 'carbsG', 'fatG'],
+            },
+            coachingNote: { type: 'STRING' },
+          },
+          required: ['name', 'mealType', 'goalAlignment', 'description', 'ingredients', 'steps', 'timeMinutes', 'nutrition', 'coachingNote'],
+        },
+      },
+    },
+    required: ['recipes'],
+  },
+  normalize(parsed) {
+    const raw = parsed && typeof parsed === 'object' ? (parsed as { recipes?: unknown }).recipes : undefined;
+    const out: Record<string, unknown>[] = [];
+    for (const r of Array.isArray(raw) ? raw : []) {
+      if (!r || typeof r !== 'object') continue;
+      const o = r as Record<string, unknown>;
+      const n = (o.nutrition ?? {}) as Record<string, unknown>;
+      const recipe = {
+        name: str(o.name, 80),
+        mealType: str(o.mealType, 30),
+        goalAlignment: str(o.goalAlignment, 240),
+        description: str(o.description, 300),
+        ingredients: strings(o.ingredients, 12, 120),
+        steps: strings(o.steps, 8, 240),
+        timeMinutes: num(o.timeMinutes, 1, 180),
+        nutrition: { calories: num(n.calories, 30, 1500), proteinG: num(n.proteinG, 0, 120), carbsG: num(n.carbsG, 0, 250), fatG: num(n.fatG, 0, 120) },
+        coachingNote: str(o.coachingNote, 300),
+      };
+      const nutritionOk = Object.values(recipe.nutrition).every((v) => v !== null);
+      if (recipe.name && recipe.description && recipe.ingredients.length >= 3 && recipe.steps.length >= 2 && recipe.timeMinutes && nutritionOk && recipe.coachingNote) out.push(recipe);
+      if (out.length >= 5) break;
+    }
+    return out.length ? { recipes: out } : null;
+  },
+};
+
+const TOOLS: Record<string, ToolSpec> = { hashtags, challenge, recipes };
+
+/* -------------------------------- handler -------------------------------- */
+
+interface GenerateRequest {
+  method?: string;
+  body?: unknown;
+}
+
+interface GenerateResponse {
+  setHeader(name: string, value: string): unknown;
+  status(code: number): { json(body: unknown): void; end(): void };
 }
 
 export default async function handler(
@@ -194,13 +427,14 @@ export default async function handler(
   const { key, source } = findKey();
   const model = process.env.GEMINI_MODEL || DEFAULT_MODEL;
 
-  // Deploy check: `curl https://<app>/api/generate` → which env var holds the key (names only, never values).
+  // Deploy check: `curl https://<app>/api/generate` shows which env var holds the key (names only, never values).
   if (req.method === 'GET') {
     res.status(200).json({
       configured: Boolean(key),
       model,
       keySource: source,
       acceptedKeyNames: KEY_ENV_NAMES,
+      tools: Object.keys(TOOLS),
     });
     return;
   }
@@ -213,7 +447,11 @@ export default async function handler(
     return;
   }
 
-  const input = parseInput(req.body);
+  const body = typeof req.body === 'string' ? safeJson(req.body) : req.body;
+  const o = body && typeof body === 'object' ? (body as Record<string, unknown>) : null;
+  const toolName = typeof o?.tool === 'string' && o.tool in TOOLS ? (o.tool as string) : 'hashtags';
+  const spec = TOOLS[toolName];
+  const input = o ? spec.parse(o) : null;
   if (!input) {
     res.status(400).json({ error: 'bad_request' });
     return;
@@ -221,7 +459,6 @@ export default async function handler(
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), UPSTREAM_TIMEOUT_MS);
-
   try {
     const upstream = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
@@ -230,51 +467,33 @@ export default async function handler(
         headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
         signal: controller.signal,
         body: JSON.stringify({
-          contents: [{ role: 'user', parts: [{ text: buildPrompt(input) }] }],
+          contents: [{ role: 'user', parts: [{ text: spec.prompt(input) }] }],
           generationConfig: {
             temperature: 0.9,
             // Generous: on thinking models the budget also covers reasoning tokens.
-            maxOutputTokens: 4096,
+            maxOutputTokens: spec.maxOutputTokens,
             responseMimeType: 'application/json',
-            responseSchema: RESPONSE_SCHEMA,
+            responseSchema: spec.schema,
           },
         }),
       },
     );
 
     if (!upstream.ok) {
-      console.error(
-        `gemini ${model} responded ${upstream.status}:`,
-        (await upstream.text()).slice(0, 300),
-      );
+      console.error(`[${toolName}] gemini ${model} responded ${upstream.status}:`, (await upstream.text()).slice(0, 300));
       res.status(502).json({ error: 'upstream', status: upstream.status });
       return;
     }
 
-    const parsed = safeJson(extractText(await upstream.json()));
-    const rawGroups =
-      parsed && typeof parsed === 'object'
-        ? (parsed as { groups?: unknown }).groups
-        : undefined;
-    const seen = new Set<Platform>();
-    const groups: { platform: Platform; hashtags: string[] }[] = [];
-    for (const g of Array.isArray(rawGroups) ? rawGroups : []) {
-      if (!g || typeof g !== 'object') continue;
-      const platform = matchPlatform((g as { platform?: unknown }).platform);
-      const hashtags = strings((g as { hashtags?: unknown }).hashtags, 30, 40);
-      if (!platform || seen.has(platform) || hashtags.length === 0) continue;
-      seen.add(platform);
-      groups.push({ platform, hashtags });
-    }
-
-    if (groups.length === 0) {
-      console.error(`gemini ${model} returned no usable groups`);
+    const payload = spec.normalize(safeJson(extractText(await upstream.json())));
+    if (!payload) {
+      console.error(`[${toolName}] gemini ${model} returned no usable answer`);
       res.status(502).json({ error: 'empty' });
       return;
     }
-    res.status(200).json({ groups, model });
+    res.status(200).json({ ...payload, model, tool: toolName });
   } catch (err) {
-    console.error('gemini request failed:', err instanceof Error ? err.message : err);
+    console.error(`[${toolName}] gemini request failed:`, err instanceof Error ? err.message : err);
     res.status(502).json({ error: 'upstream' });
   } finally {
     clearTimeout(timer);

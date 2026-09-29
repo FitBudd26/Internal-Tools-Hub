@@ -5,7 +5,7 @@ import { SelectDropdown } from '../../shared/components/SelectDropdown';
 import { ToolMark } from '../../shared/components/ToolMark';
 import { isValidEmail } from '../../shared/lib/tracking';
 import { ChallengeModal } from './ChallengeModal';
-import { generateChallenge } from './generateChallenge';
+import { generateChallengeWithAi } from './aiChallenge';
 import { trackCtaClick, trackLead, trackPdfDownload } from './tracking';
 import {
   AUDIENCE_TYPES,
@@ -71,6 +71,9 @@ export function FitnessChallengeGenerator() {
   });
   const [challenge, setChallenge] = useState<Challenge | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
+  const [pending, setPending] = useState<'idle' | 'generate' | 'regenerate'>('idle');
+  const [variant, setVariant] = useState(0);
+  const generating = pending === 'generate';
 
   const touch = (field: Field) => setTouched((t) => ({ ...t, [field]: true }));
   const set = <K extends keyof ChallengeFormState>(key: K, value: ChallengeFormState[K]) =>
@@ -88,15 +91,35 @@ export function FitnessChallengeGenerator() {
   const nameError = touched.name && !nameValid;
   const emailError = touched.email && !emailValid;
 
-  const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!isValid) return;
-    const input = toChallengeInput(form);
-    const generated = generateChallenge(input);
-    setChallenge(generated);
-    setModalOpen(true);
-    // HubSpot lead (email + name + selections); fire-and-forget, never blocks results.
-    trackLead(input, form.email, form.name, form.sendMoreTools, generated);
+    if (!isValid || pending !== 'idle') return;
+    setPending('generate');
+    try {
+      const input = toChallengeInput(form);
+      // Gemini via /api/generate when configured; the built-in engine otherwise.
+      const { challenge: generated } = await generateChallengeWithAi(input, 0);
+      setChallenge(generated);
+      setVariant(0);
+      setModalOpen(true);
+      // HubSpot lead (email + name + selections); fire-and-forget, never blocks results.
+      trackLead(input, form.email, form.name, form.sendMoreTools, generated);
+    } finally {
+      setPending('idle');
+    }
+  };
+
+  const handleRegenerate = async () => {
+    if (pending !== 'idle' || !challenge) return;
+    const next = variant + 1;
+    setPending('regenerate');
+    try {
+      const { challenge: generated } = await generateChallengeWithAi(toChallengeInput(form), next, [challenge.challengeName]);
+      setVariant(next);
+      setChallenge(generated);
+    } finally {
+      setPending('idle');
+    }
   };
 
   const createAnother = () => {
@@ -271,10 +294,13 @@ export function FitnessChallengeGenerator() {
           <div className="mt-auto">
             <button
               type="submit"
-              disabled={!isValid}
-              className="h-[46px] w-full rounded-xl bg-fb-orange text-sm font-semibold text-white transition-colors enabled:hover:bg-fb-accent-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fb-orange disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-400"
+              disabled={!isValid || pending !== 'idle'}
+              aria-busy={generating}
+              className={`h-[46px] w-full rounded-xl bg-fb-orange text-sm font-semibold text-white transition-colors enabled:hover:bg-fb-accent-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fb-orange ${
+                generating ? 'cursor-wait opacity-80' : 'disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-400'
+              }`}
             >
-              Create My Challenge
+              {generating ? 'Generating…' : 'Create My Challenge'}
             </button>
             <p className="mt-1 text-center text-xs text-gray-400">
               Ready-to-run framework + client-ready PDF
@@ -286,6 +312,8 @@ export function FitnessChallengeGenerator() {
       <ChallengeModal
         open={modalOpen}
         challenge={challenge}
+        regenerating={pending === 'regenerate'}
+        onRegenerate={handleRegenerate}
         onClose={() => setModalOpen(false)}
         onCreateAnother={createAnother}
         onPdfDownloaded={() => {

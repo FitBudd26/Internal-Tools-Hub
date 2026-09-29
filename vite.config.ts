@@ -86,6 +86,7 @@ export default defineConfig({
         index: 'index.html',
         'hashtag-generator': 'hashtag-generator/index.html',
         'fitness-challenge-generator': 'fitness-challenge-generator/index.html',
+        'recipe-generator': 'recipe-generator/index.html',
       },
     },
   },

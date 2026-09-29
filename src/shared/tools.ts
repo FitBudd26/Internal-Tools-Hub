@@ -14,13 +14,20 @@ export const TOOLS: ToolMeta[] = [
     name: 'Hashtag Generator',
     description:
       'Platform-tailored hashtag sets from a caption (Gemini with a local fallback). Captures name + email.',
-    fallbackHeight: 720,
+    fallbackHeight: 580,
   },
   {
     slug: 'fitness-challenge-generator',
     name: 'Fitness Challenge Generator for Coaches & Gyms',
     description:
       'Ready-to-run client challenge frameworks with a branded PDF. Email-gated results, B2B lead magnet.',
+    fallbackHeight: 580,
+  },
+  {
+    slug: 'recipe-generator',
+    name: 'Fitness Recipe Generator for Coaches & Gyms',
+    description:
+      'Goal-aligned recipe ideas for clients (Gemini with a built-in recipe library) with a branded PDF. Captures name + email.',
     fallbackHeight: 580,
   },
 ];
