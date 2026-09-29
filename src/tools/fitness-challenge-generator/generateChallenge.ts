@@ -84,9 +84,9 @@ const HABITS: Record<ChallengeType, string[]> = {
   'Habit Building': ['Complete your one keystone habit (chosen on day 1)', 'Prepare tomorrow the night before', 'Two-minute rule: start, even on low-energy days'],
   'Consistency / Accountability': ['Log the day before 9 pm', "Plan tomorrow's session time", 'Tell your accountability partner you are done'],
   Strength: ['Log RPE for your main work', 'No skipped warm-ups', '7+ hours of sleep', 'Protein at every meal'],
-  Conditioning: ['One steady-state movement block (20–30 min)', 'Note heart rate or RPE after sessions', 'Hydrate before and after training'],
-  'Mobility & Recovery': ['10-minute mobility block', '7+ hours of sleep', 'Stress score (1–10) logged', 'Screen-free 30 minutes before bed'],
-  'Lifestyle / Wellness': ['10 minutes outside', 'Screen-free hour before bed', 'Water target: about 2–3 L (70–100 oz)', 'One home-cooked meal'],
+  Conditioning: ['One steady-state movement block (20-30 min)', 'Note heart rate or RPE after sessions', 'Hydrate before and after training'],
+  'Mobility & Recovery': ['10-minute mobility block', '7+ hours of sleep', 'Stress score (1-10) logged', 'Screen-free 30 minutes before bed'],
+  'Lifestyle / Wellness': ['10 minutes outside', 'Screen-free hour before bed', 'Water target: about 2-3 L (70-100 oz)', 'One home-cooked meal'],
   'Community Engagement': ['Post your check-in in the group', 'Encourage one other participant', 'Share one win from the day'],
 };
 
@@ -138,7 +138,7 @@ function weeklyThemes(days: number, primary: ChallengeType, community: boolean, 
   const baseline = {
     name: 'Consistency & Baseline',
     focus: 'Showing up daily and logging it',
-    coachTip: 'Emphasise "don\'t break the chain" — completion beats intensity in week one.',
+    coachTip: 'Emphasise "don\'t break the chain": completion beats intensity in week one.',
   };
   const quality =
     primary === 'Community Engagement' || (community && primary === 'Consistency / Accountability')
@@ -159,7 +159,7 @@ function weeklyThemes(days: number, primary: ChallengeType, community: boolean, 
   const peak = { name: 'Peak Compliance', focus: 'Completion streaks', coachTip: 'Use public recognition and shoutouts.' };
 
   if (days <= 7) {
-    return [{ label: 'Days 1–7', name: 'Consistency Sprint', focus: 'Seven straight completed days', coachTip: 'Daily reminders matter more than motivation speeches.' }];
+    return [{ label: 'Days 1-7', name: 'Consistency Sprint', focus: 'Seven straight completed days', coachTip: 'Daily reminders matter more than motivation speeches.' }];
   }
   if (days <= 14) return [{ label: 'Week 1', ...baseline }, { label: 'Week 2', ...peak }];
   if (days <= 21) return [{ label: 'Week 1', ...baseline }, { label: 'Week 2', ...quality }, { label: 'Week 3', ...peak }];
@@ -167,7 +167,7 @@ function weeklyThemes(days: number, primary: ChallengeType, community: boolean, 
     { label: 'Week 1', ...baseline },
     { label: 'Week 2', ...quality },
     { label: 'Week 3', ...sustain },
-    { label: days > 28 ? `Days 22–${days}` : 'Week 4', ...peak },
+    { label: days > 28 ? `Days 22-${days}` : 'Week 4', ...peak },
   ];
 }
 
@@ -199,10 +199,10 @@ export function generateChallenge(input: ChallengeInput): Challenge {
   const forLabel = (groups.length ? groups : ['clients' as Group]).slice(0, 2).map((g) => GROUP_LABEL[g]).join(' & ');
   const subtitle = `${days}-Day ${focus} Challenge for ${forLabel}`;
 
-  const objective = `Help ${noun} ${joinClauses(types.slice(0, 2).map((t) => OBJECTIVE[t]))} by completing daily non-negotiable actions — without replacing their existing training program.`;
+  const objective = `Help ${noun} ${joinClauses(types.slice(0, 2).map((t) => OBJECTIVE[t]))} by completing daily non-negotiable actions, without replacing their existing training program.`;
 
   const howItWorks = present([
-    `${Noun} earn a daily completion score by finishing the required actions below. No programming changes required — this challenge layers on top of your current training plan.`,
+    `${Noun} earn a daily completion score by finishing the required actions below. No programming changes required: this challenge layers on top of your current training plan.`,
     community && 'Group visibility does the motivating: streaks, check-ins and shoutouts are part of the design.',
     workplace && 'Participation is deliberately simple so completion rates stay high across mixed schedules and fitness backgrounds.',
     social && 'Every task doubles as a public prompt, so participation creates reach and inbound leads.',
@@ -213,12 +213,12 @@ export function generateChallenge(input: ChallengeInput): Challenge {
   for (const t of types) for (const h of HABITS[t].slice(0, 2)) if (!habits.includes(h) && habits.length < 4) habits.push(h);
   for (const h of HABITS[primary]) if (!habits.includes(h) && habits.length < 3) habits.push(h);
 
-  const movementTarget = beginnerOnly ? '6,000–8,000 steps' : '8,000–10,000 steps';
+  const movementTarget = beginnerOnly ? '6,000-8,000 steps' : '8,000-10,000 steps';
   const dailyRules: DailyRule[] = [
     {
       title: 'Complete the assigned training session',
       details: present([
-        'Coach-programmed or self-led — the challenge stays workout-agnostic',
+        'Coach-programmed or self-led (the challenge stays workout-agnostic)',
         'Planned rest days count as complete when the plan says rest',
         mixed && 'Scale to the plan you are on: completion counts, not intensity',
       ]),
@@ -226,7 +226,7 @@ export function generateChallenge(input: ChallengeInput): Challenge {
     {
       title: 'Hit the daily movement target',
       details: present([
-        `${movementTarget}, or 20–30 minutes of steady movement on non-training days`,
+        `${movementTarget}, or 20-30 minutes of steady movement on non-training days`,
         mixed && 'Choose a personal target inside the range on day 1 and keep it for the whole challenge',
         workplace && 'Walking meetings and commute steps count',
       ]),
@@ -240,7 +240,7 @@ export function generateChallenge(input: ChallengeInput): Challenge {
           : workplace
             ? 'Mark the day complete on the team tracker'
             : 'Log completion in the app or form',
-        'Rate energy 1–10 (and note sleep hours if you track them)',
+        'Rate energy 1-10 (and note sleep hours if you track them)',
       ],
     },
   ];
@@ -266,7 +266,7 @@ export function generateChallenge(input: ChallengeInput): Challenge {
     'Daily completion: Yes / No',
     'Weekly completion percentage',
     'Step or movement-minute averages',
-    'Energy and fatigue trends (1–10)',
+    'Energy and fatigue trends (1-10)',
     weightUnit &&
       (bodyComp
         ? `Body weight (${weightUnit}), same day and time each week`
@@ -274,16 +274,16 @@ export function generateChallenge(input: ChallengeInput): Challenge {
     lengthUnit && bodyComp && `Waist and hip measurements (${lengthUnit}), every two weeks`,
     loads &&
       types.some((t) => t === 'Strength' || t === 'Muscle Building') &&
-      `Top working-set loads for main lifts (${weightUnit ?? 'kg / lb'}) — trend, not records`,
+      `Top working loads for main lifts (${weightUnit ?? 'kg / lb'}): watch the trend, not records`,
     types.some((t) => t === 'Mobility & Recovery' || t === 'Lifestyle / Wellness') &&
-      'Sleep hours and a morning readiness score (1–10)',
+      'Sleep hours and a morning readiness score (1-10)',
     bodyComp && 'Before/after photos if appropriate for the participant',
   ]);
 
   const coachingNotes = present([
     'Works with any training split or class schedule',
     mixed
-      ? 'Every rule scales across levels — completion is the standard, not intensity'
+      ? 'Every rule scales across levels: completion is the standard, not intensity'
       : 'Rules are written for one level; tighten targets if the group is stronger than expected',
     'Encourages daily engagement without extra programming work',
     'Runs well inside a branded coaching app: daily tasks, check-ins and streaks in one place',
@@ -292,17 +292,17 @@ export function generateChallenge(input: ChallengeInput): Challenge {
       : 'Equipment only affects what you track (for example loads), never whether someone can take part',
     community && 'Run a leaderboard and post weekly shoutouts; recognition beats reminders',
     workplace && 'Keep it simple: one tracker, one weekly summary email, one closing recognition',
-    social && 'Use each daily rule as a public prompt and ask participants to tag you — it is a lead-generation asset',
+    social && 'Use each daily rule as a public prompt and ask participants to tag you. It is a lead-generation asset',
     has('members') && 'Post the weekly theme on the floor and in your app so members see it every visit',
   ]);
 
   const clientInstructions = [
     `Welcome to the ${challengeName}. For the next ${days} days you complete four simple actions every day, on top of your normal training.`,
     `Each day: finish your session, hit your movement target, tick your ${habitLabel} habit check, and log your check-in before bed.`,
-    'Every week has a focus (see the weekly plan). Read it on day one of the week — it tells you what to pay attention to.',
+    'Every week has a focus (see the weekly plan). Read it on day one of the week: it tells you what to pay attention to.',
     'Miss a day? Restart your streak the next morning. The goal is consistency, not perfection.',
     community || social
-      ? 'Check in where everyone can see it — your visible streak helps the whole group.'
+      ? 'Check in where everyone can see it. Your visible streak helps the whole group.'
       : 'Your coach sees your log; ask questions early rather than skipping days.',
   ];
 
@@ -310,7 +310,7 @@ export function generateChallenge(input: ChallengeInput): Challenge {
   const level = input.fitnessLevels.join(', ') || 'All levels';
   const duration = `${days} Days`;
 
-  const overview = `A ${days}-day ${focus.toLowerCase()} challenge for ${forLabel.toLowerCase()}: ${dailyRules.length} daily non-negotiables, ${themes.length === 1 ? 'one theme' : `${themes.length} weekly themes`}, an optional scoring system and a day-by-day check-in tracker. It layers on top of your existing training program — no programming changes required.`;
+  const overview = `A ${days}-day ${focus.toLowerCase()} challenge for ${forLabel.toLowerCase()}: ${dailyRules.length} daily non-negotiables, ${themes.length === 1 ? 'one theme' : `${themes.length} weekly themes`}, an optional scoring system and a day-by-day check-in tracker. It layers on top of your existing training program, with no programming changes required.`;
 
   const pdfSections: PdfSection[] = [
     { heading: 'Challenge Overview', paragraphs: [overview] },
@@ -324,7 +324,7 @@ export function generateChallenge(input: ChallengeInput): Challenge {
     { heading: 'Daily Challenge Rules', numbered: dailyRules },
     {
       heading: 'Weekly Plan',
-      bullets: themes.map((t) => `${t.label} — ${t.name}. Focus: ${t.focus}. Coach tip: ${t.coachTip}`),
+      bullets: themes.map((t) => `${t.label}: ${t.name}. Focus: ${t.focus}. Coach tip: ${t.coachTip}`),
     },
     { heading: 'Client Instructions', paragraphs: clientInstructions },
     { heading: 'Progress Tracking', bullets: progressTracking },

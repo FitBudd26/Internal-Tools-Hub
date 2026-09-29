@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { MultiSelectChips } from '../../shared/components/MultiSelectChips';
+import { MultiSelectDropdown } from '../../shared/components/MultiSelectDropdown';
 import { SelectDropdown } from '../../shared/components/SelectDropdown';
 import { ToolMark } from '../../shared/components/ToolMark';
 import { isValidEmail } from '../../shared/lib/tracking';
@@ -115,31 +116,33 @@ export function FitnessChallengeGenerator() {
               <span className="truncate">Fitness Challenge Generator</span>
             </h1>
             <p className="mt-1 text-center text-[13px] text-gray-600">
-              Create ready-to-use challenges for clients, groups, or communities — in seconds.
+              Create ready-to-use challenges for clients, groups, or communities in seconds.
             </p>
           </div>
 
-          <div>
-            <MultiSelectChips
-              label="Challenge Type"
-              required
-              options={CHALLENGE_TYPES}
-              selected={form.challengeTypes}
-              onChange={(v) => {
-                touch('challengeTypes');
-                set('challengeTypes', v);
-              }}
-            />
-            {typesError && (
-              <p className="mt-1 text-xs text-red-500" role="alert">
-                Select at least one challenge type.
-              </p>
-            )}
-          </div>
-
-          {/* Single-choice fields as dropdowns, two per row when the card is wide enough. */}
-          <div className="@container relative z-20">
-            <div className="grid grid-cols-1 gap-2.5 @sm:grid-cols-2">
+          {/* Dropdowns for anything with more than five options, two per row when
+              the card is wide enough; rows are z-stacked so an open panel overlays
+              the row below. */}
+          <div className="@container relative z-30">
+            <div className="grid grid-cols-1 items-end gap-2.5 @sm:grid-cols-2">
+              <div>
+                <MultiSelectDropdown
+                  label="Challenge Type"
+                  required
+                  placeholder="Select challenge types"
+                  options={CHALLENGE_TYPES}
+                  selected={form.challengeTypes}
+                  onChange={(v) => {
+                    touch('challengeTypes');
+                    set('challengeTypes', v);
+                  }}
+                />
+                {typesError && (
+                  <p className="mt-1 text-xs text-red-500" role="alert">
+                    Select at least one challenge type.
+                  </p>
+                )}
+              </div>
               <SelectDropdown
                 label="Audience"
                 required
@@ -148,6 +151,11 @@ export function FitnessChallengeGenerator() {
                 selected={form.audience}
                 onChange={(v) => set('audience', v)}
               />
+            </div>
+          </div>
+
+          <div className="@container relative z-20">
+            <div className="grid grid-cols-1 items-end gap-2.5 @sm:grid-cols-2">
               <SelectDropdown
                 label="Fitness Level"
                 required
@@ -156,11 +164,6 @@ export function FitnessChallengeGenerator() {
                 selected={form.fitnessLevel}
                 onChange={(v) => set('fitnessLevel', v)}
               />
-            </div>
-          </div>
-
-          <div className="@container relative z-10">
-            <div className="grid grid-cols-1 gap-2.5 @sm:grid-cols-2">
               <SelectDropdown
                 label="Duration"
                 required
@@ -169,15 +172,18 @@ export function FitnessChallengeGenerator() {
                 selected={form.duration}
                 onChange={(v) => set('duration', v)}
               />
-              <SelectDropdown
-                label="Equipment"
-                required
-                placeholder="Select equipment"
-                options={EQUIPMENT_OPTIONS}
-                selected={form.equipment}
-                onChange={(v) => set('equipment', v)}
-              />
             </div>
+          </div>
+
+          <div className="relative z-10">
+            <SelectDropdown
+              label="Equipment"
+              required
+              placeholder="Select equipment"
+              options={EQUIPMENT_OPTIONS}
+              selected={form.equipment}
+              onChange={(v) => set('equipment', v)}
+            />
           </div>
 
           <div>
@@ -199,7 +205,7 @@ export function FitnessChallengeGenerator() {
           </div>
 
           <div className="@container">
-            <div className="grid grid-cols-1 gap-2.5 @sm:grid-cols-2">
+            <div className="grid grid-cols-1 items-end gap-2.5 @sm:grid-cols-2">
               <div>
                 <label className="block">
                   <span className={labelCls}>

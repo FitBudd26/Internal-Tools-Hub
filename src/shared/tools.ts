@@ -1,4 +1,4 @@
-/** Registry of every tool in the hub — drives the internal index page. */
+/** Registry of every tool in the hub, drives the internal index page. */
 export interface ToolMeta {
   /** URL path segment and the `tool` value sent to /api/track. */
   slug: string;

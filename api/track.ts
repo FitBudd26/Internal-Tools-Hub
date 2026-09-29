@@ -1,15 +1,15 @@
 /**
  * Vercel serverless route shared by every tool in the hub: forwards a tool's
  * lead or event to HubSpot's Forms Submission API. Credentials live only in
- * server env vars — never in the frontend bundle:
+ * server env vars, never in the frontend bundle:
  *
- *   HUBSPOT_PORTAL_ID                 optional — defaults to FitBudd's portal
- *   HUBSPOT_FORM_ID_<TOOL>            optional — per-tool form override, e.g.
+ *   HUBSPOT_PORTAL_ID                 optional, defaults to FitBudd's portal
+ *   HUBSPOT_FORM_ID_<TOOL>            optional, per-tool form override, e.g.
  *                                     HUBSPOT_FORM_ID_FITNESS_CHALLENGE_GENERATOR
- *   HUBSPOT_FORM_ID                   optional — overrides every tool's default form
- *   (each tool has its own default form below — the IDs are public, they
+ *   HUBSPOT_FORM_ID                   optional, overrides every tool's default form
+ *   (each tool has its own default form below, the IDs are public, they
  *   appear in the forms' embed snippets)
- *   HUBSPOT_PRIVATE_APP_TOKEN         optional — switches to the authenticated
+ *   HUBSPOT_PRIVATE_APP_TOKEN         optional, switches to the authenticated
  *                                     "secure submit" endpoint when present
  *
  * Request body: { tool, type, fields }. Each tool declares which fields each
@@ -117,7 +117,7 @@ const formShapeCache = new Map<string, { shape: FormShape | null; at: number }>(
 /**
  * Fetch the form's field list from HubSpot's public embed endpoint, cached
  * per function instance. Returns null when the shape is unknown (endpoint
- * down or unparseable) — the caller then sends everything and lets HubSpot
+ * down or unparseable), the caller then sends everything and lets HubSpot
  * decide.
  */
 async function getFormShape(portalId: string, formId: string): Promise<FormShape | null> {
@@ -169,7 +169,7 @@ async function getFormShape(portalId: string, formId: string): Promise<FormShape
 }
 
 const warned = new Set<string>();
-/** Once per tool/form per instance: say what the form lacks — the usual reason tracking "doesn't work". */
+/** Once per tool/form per instance: say what the form lacks, the usual reason tracking "doesn't work". */
 function warnOnce(tool: string, formId: string, cfg: ToolConfig, shape: FormShape) {
   const key = `${tool}/${formId}`;
   if (warned.has(key)) return;
@@ -178,7 +178,7 @@ function warnOnce(tool: string, formId: string, cfg: ToolConfig, shape: FormShap
   const missing = all.filter((n) => !shape.names.has(n));
   const neverSent = shape.required.filter((n) => !all.includes(n));
   if (missing.length) console.warn(`[${tool}] hubspot form ${formId} lacks fields (not sent): ${missing.join(', ')}`);
-  if (neverSent.length) console.warn(`[${tool}] hubspot form ${formId} requires ${neverSent.join(', ')}, which this tool never sends — make them optional`);
+  if (neverSent.length) console.warn(`[${tool}] hubspot form ${formId} requires ${neverSent.join(', ')}, which this tool never sends, make them optional`);
 }
 
 /* -------------------------------- handler -------------------------------- */
@@ -242,7 +242,7 @@ export default async function handler(
           value: (fields[name] as string).slice(0, 4000),
         }));
 
-      // Only fields the form defines — HubSpot rejects the whole submission
+      // Only fields the form defines, HubSpot rejects the whole submission
       // otherwise (FIELD_NOT_IN_FORM_DEFINITION).
       const shape = await getFormShape(portalId, formId);
       if (shape) warnOnce(tool, formId, cfg, shape);

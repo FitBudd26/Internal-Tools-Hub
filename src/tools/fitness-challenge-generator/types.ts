@@ -77,7 +77,7 @@ export interface DailyRule {
 }
 
 export interface WeeklyTheme {
-  /** "Week 1", or "Days 22–30" for the tail of a 30-day run. */
+  /** "Week 1", or "Days 22-30" for the tail of a 30-day run. */
   label: string;
   name: string;
   focus: string;

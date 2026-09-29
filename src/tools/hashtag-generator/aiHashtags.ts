@@ -14,9 +14,9 @@ import {
  *
  * The serverless route (/api/generate → Gemini) produces caption-specific,
  * non-repeating hashtags. Whatever comes back is pushed through the same
- * rules the local engine follows — lowercase letters/digits, banned and
+ * rules the local engine follows, lowercase letters/digits, banned and
  * platform-inappropriate tags removed, the caption's own tags skipped, spec
- * count ranges, "at most three platforms per tag" — and any platform the
+ * count ranges, "at most three platforms per tag", and any platform the
  * model under-delivers is topped up from the deterministic engine. If the
  * route is missing, unconfigured, rate-limited, slow or returns junk, the
  * deterministic result is used as-is. Results always appear.

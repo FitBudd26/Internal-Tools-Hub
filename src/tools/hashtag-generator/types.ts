@@ -48,7 +48,7 @@ export interface HashtagFormState {
   postType: PostType | null;
   platforms: Platform[];
   tones: ToneGoal[];
-  /** Lead capture — the only two values recorded in HubSpot. */
+  /** Lead capture, the only two values recorded in HubSpot. */
   name: string;
   email: string;
 }

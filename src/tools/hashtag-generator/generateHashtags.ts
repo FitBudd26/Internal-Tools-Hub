@@ -16,7 +16,7 @@ import type {
 
 const MAX_TAG_LEN = 28;
 
-/** Spammy engagement-bait tags that hurt reach — never suggest. */
+/** Spammy engagement-bait tags that hurt reach, never suggest. */
 const BANNED = new Set([
   'follow4follow',
   'followforfollow',
@@ -123,14 +123,14 @@ const PLATFORM_SPECS: Record<Platform, PlatformSpec> = {
     staples: ['fyp', 'foryoupage', 'tiktok'],
     reserve: 2,
     banned: new Set(),
-    tip: 'Mix niche and trend tags — keep them short and relevant.',
+    tip: 'Mix niche and trend tags, and keep them short and relevant.',
   },
   'Twitter/X': {
     count: 3,
     staples: [],
     reserve: 0,
     banned: VIRAL_TAGS,
-    tip: 'Keep it minimal and context-driven — long tag blocks hurt reach.',
+    tip: 'Keep it minimal and context-driven. Long tag blocks hurt reach.',
   },
   LinkedIn: {
     count: 5,
@@ -165,7 +165,7 @@ const PLATFORM_SPECS: Record<Platform, PlatformSpec> = {
     staples: ['threads'],
     reserve: 1,
     banned: VIRAL_TAGS,
-    tip: 'Keep it conversational — one or two tags is plenty.',
+    tip: 'Keep it conversational. One or two tags is plenty.',
   },
 };
 
@@ -286,7 +286,7 @@ function extractCaptionTags(caption: string): {
   return { words, bigrams: bigrams.slice(0, 3), existing };
 }
 
-/** Hashtags the caption already contains — never re-suggested. */
+/** Hashtags the caption already contains, never re-suggested. */
 export function captionOwnTags(caption: string): Set<string> {
   return extractCaptionTags(caption).existing;
 }
@@ -347,7 +347,7 @@ export function generateHashtags(
     'keepshowingup',
   ];
 
-  // How many platform sets each tag has already appeared in — used to keep
+  // How many platform sets each tag has already appeared in, used to keep
   // one strong tag from repeating across every selected platform.
   const globalUse = new Map<string, number>();
 

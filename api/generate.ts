@@ -1,9 +1,9 @@
 /**
  * Vercel serverless route: asks Google Gemini for caption-specific,
- * platform-grouped hashtags. The API key lives only in a server env var —
+ * platform-grouped hashtags. The API key lives only in a server env var,
  * nothing Gemini-related ships in the frontend bundle:
  *
- *   GEMINI_API_KEY   required — without it this route answers 503 and the
+ *   GEMINI_API_KEY   required, without it this route answers 503 and the
  *                    client quietly uses the built-in deterministic engine.
  *                    GOOGLE_API_KEY and the other names in KEY_ENV_NAMES are
  *                    accepted too, so an existing Vercel variable just works.
@@ -105,7 +105,7 @@ interface Input {
   postType: string;
   tones: string[];
   platforms: Platform[];
-  /** Tags already shown to the user (Regenerate) — the model is told to avoid them. */
+  /** Tags already shown to the user (Regenerate), the model is told to avoid them. */
   avoid: string[];
 }
 
@@ -155,7 +155,7 @@ function buildPrompt(input: Input): string {
     'You write hashtags for one social media post. Reply with JSON only, matching this shape: {"groups":[{"platform":"<name>","hashtags":["tag","tag"]}]}.',
     '',
     `Caption: """${input.caption}"""`,
-    `Topic / niche: ${input.topic || 'not given — infer it from the caption'}`,
+    `Topic / niche: ${input.topic || 'not given, infer it from the caption'}`,
     `Post type: ${input.postType || 'not given'}`,
     `Tone / goal: ${input.tones.length ? input.tones.join(', ') : 'not given'}`,
     '',

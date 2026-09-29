@@ -9,7 +9,7 @@ import {
 import { generateWithAi } from './aiHashtags';
 import { trackGeneration } from './tracking';
 import { HashMark } from '../../shared/components/HashMark';
-import { MultiSelectChips } from '../../shared/components/MultiSelectChips';
+import { MultiSelectDropdown } from '../../shared/components/MultiSelectDropdown';
 import { ResultsModal } from './ResultsModal';
 import { SelectDropdown } from '../../shared/components/SelectDropdown';
 
@@ -144,59 +144,70 @@ export function HashtagGenerator() {
             )}
           </div>
 
-          <label className="block">
-            <span className={labelCls}>
-              Topic/Niche/Keyword{' '}
-              <span className="font-normal text-gray-400">(recommended)</span>
-            </span>
-            <input
-              type="text"
-              placeholder="e.g. fitness, travel, food, tech"
-              value={form.topic}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, topic: e.target.value }))
-              }
-              className={`${inputCls} h-10 ${validCls}`}
-            />
-          </label>
-
-          <SelectDropdown
-            label="Post Type/Context"
-            labelHint="(optional)"
-            placeholder="Select post type"
-            options={POST_TYPE_OPTIONS}
-            selected={form.postType}
-            onChange={(postType) => setForm((f) => ({ ...f, postType }))}
-          />
-
-          <div>
-            <MultiSelectChips
-              label="Target Platform(s)"
-              required
-              options={PLATFORM_OPTIONS}
-              selected={form.platforms}
-              onChange={(platforms) => {
-                touch('platforms');
-                setForm((f) => ({ ...f, platforms }));
-              }}
-            />
-            {platformsError && (
-              <p className="mt-1 text-xs text-red-500" role="alert">
-                Select at least one platform.
-              </p>
-            )}
+          {/* Two fields per row when the card is wide enough (container query);
+              rows are z-stacked so an open dropdown overlays the row below. */}
+          <div className="@container relative z-30">
+            <div className="grid grid-cols-1 items-end gap-2.5 @sm:grid-cols-2">
+              <label className="block">
+                <span className={labelCls}>
+                  Topic/Niche{' '}
+                  <span className="font-normal text-gray-400">(recommended)</span>
+                </span>
+                <input
+                  type="text"
+                  placeholder="e.g. fitness, travel, food, tech"
+                  value={form.topic}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, topic: e.target.value }))
+                  }
+                  className={`${inputCls} h-10 ${validCls}`}
+                />
+              </label>
+              <SelectDropdown
+                label="Post Type/Context"
+                labelHint="(optional)"
+                placeholder="Select post type"
+                options={POST_TYPE_OPTIONS}
+                selected={form.postType}
+                onChange={(postType) => setForm((f) => ({ ...f, postType }))}
+              />
+            </div>
           </div>
 
-          <MultiSelectChips
-            label="Tone/Goal"
-            options={TONE_OPTIONS}
-            selected={form.tones}
-            onChange={(tones) => setForm((f) => ({ ...f, tones }))}
-          />
+          <div className="@container relative z-20">
+            <div className="grid grid-cols-1 items-end gap-2.5 @sm:grid-cols-2">
+              <div>
+                <MultiSelectDropdown
+                  label="Target Platform(s)"
+                  required
+                  placeholder="Select platforms"
+                  options={PLATFORM_OPTIONS}
+                  selected={form.platforms}
+                  onChange={(platforms) => {
+                    touch('platforms');
+                    setForm((f) => ({ ...f, platforms }));
+                  }}
+                />
+                {platformsError && (
+                  <p className="mt-1 text-xs text-red-500" role="alert">
+                    Select at least one platform.
+                  </p>
+                )}
+              </div>
+              <MultiSelectDropdown
+                label="Tone/Goal"
+                labelHint="(optional)"
+                placeholder="Select tone or goal"
+                options={TONE_OPTIONS}
+                selected={form.tones}
+                onChange={(tones) => setForm((f) => ({ ...f, tones }))}
+              />
+            </div>
+          </div>
 
           {/* Lead capture: side by side when the card is wide enough (container query). */}
           <div className="@container">
-            <div className="grid grid-cols-1 gap-2.5 @sm:grid-cols-2">
+            <div className="grid grid-cols-1 items-end gap-2.5 @sm:grid-cols-2">
               <div>
                 <label className="block">
                   <span className={labelCls}>

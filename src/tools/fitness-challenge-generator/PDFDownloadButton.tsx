@@ -31,7 +31,7 @@ export function PDFDownloadButton({ challenge, onDownloaded }: PDFDownloadButton
       : state === 'done'
         ? '✓ PDF downloaded'
         : state === 'error'
-          ? 'Download failed — try again'
+          ? 'Download failed, try again'
           : 'Download PDF';
 
   return (

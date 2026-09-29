@@ -7,7 +7,7 @@ const TOOL_SOURCE = 'hashtag_generator';
 export const CTA_TEXT = 'Start Free Trial';
 export const CTA_URL = trialUrl(TOOL_SOURCE);
 
-/** Record the lead (name + email) once hashtags are generated — the only data this tool stores. */
+/** Record the lead (name + email) once hashtags are generated, the only data this tool stores. */
 export function trackGeneration(form: HashtagFormState): void {
   postEvent(TOOL, 'generation', {
     email: form.email.trim(),
