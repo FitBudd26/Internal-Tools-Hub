@@ -1,8 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
 import { CTASection } from '../../shared/components/CTASection';
 import { HashMark } from '../../shared/components/HashMark';
 import { ToolModal } from '../../shared/components/ToolModal';
-import { copyText } from '../../shared/lib/copy';
 import { BioCard } from './BioCard';
 import { CTA_TEXT, CTA_URL, DEMO_URL } from './tracking';
 import type { BioResult } from './types';
@@ -14,31 +12,6 @@ interface BioResultsModalProps {
   onClose: () => void;
   onRegenerate: () => void;
   onCtaClick: (text: string, url: string) => void;
-}
-
-function UsernameChip({ handle }: { handle: string }) {
-  const [copied, setCopied] = useState(false);
-  const timer = useRef<number | undefined>(undefined);
-  useEffect(() => () => window.clearTimeout(timer.current), []);
-  const handleCopy = async () => {
-    if (!(await copyText(`@${handle}`))) return;
-    setCopied(true);
-    window.clearTimeout(timer.current);
-    timer.current = window.setTimeout(() => setCopied(false), 1400);
-  };
-  return (
-    <button
-      type="button"
-      onClick={handleCopy}
-      aria-label={copied ? 'Copied' : `Copy @${handle}`}
-      title={copied ? 'Copied' : `Copy @${handle}`}
-      className={`rounded-full border px-2.5 py-1 font-mono text-xs transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-fb-teal ${
-        copied ? 'border-fb-teal bg-fb-teal text-white' : 'border-fb-tint-border bg-white text-gray-700 hover:border-fb-teal hover:text-fb-teal'
-      }`}
-    >
-      {copied ? '✓ Copied' : `@${handle}`}
-    </button>
-  );
 }
 
 export function BioResultsModal({ open, result, regenerating, onClose, onRegenerate, onCtaClick }: BioResultsModalProps) {
@@ -73,16 +46,6 @@ export function BioResultsModal({ open, result, regenerating, onClose, onRegener
         <BioCard key={bio.text} bio={bio} index={i} />
       ))}
 
-      <section className="rounded-lg border border-fb-tint-border bg-white p-2.5">
-        <h3 className="text-[13px] font-bold text-gray-900">Username ideas</h3>
-        <p className="mt-0.5 text-[11px] text-gray-500">Tap to copy. Availability is not checked, so search each one on Instagram first.</p>
-        <div className="mt-1.5 flex flex-wrap gap-1.5">
-          {result.usernames.map((u) => (
-            <UsernameChip key={u} handle={u} />
-          ))}
-        </div>
-      </section>
-
       <button
         type="button"
         onClick={onRegenerate}
@@ -90,7 +53,7 @@ export function BioResultsModal({ open, result, regenerating, onClose, onRegener
         aria-busy={regenerating}
         className="mx-auto rounded text-[13px] font-medium text-gray-500 transition-colors hover:text-gray-800 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fb-orange disabled:cursor-wait disabled:opacity-60 disabled:hover:no-underline"
       >
-        {regenerating ? 'Regenerating…' : '↻ Regenerate bios and usernames'}
+        {regenerating ? 'Regenerating…' : '↻ Regenerate bios'}
       </button>
     </ToolModal>
   );

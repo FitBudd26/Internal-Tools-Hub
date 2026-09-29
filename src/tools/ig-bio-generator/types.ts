@@ -51,7 +51,7 @@ export type Tone = (typeof TONES)[number];
 export type ToneOption = (typeof TONE_OPTIONS)[number];
 
 export interface BioInput {
-  /** Name or business name; also seeds the username ideas. */
+  /** Name or business name. */
   name: string;
   businessType: BusinessType | null;
   yearsExperience: string;
@@ -73,7 +73,6 @@ export interface GeneratedBio {
 
 export interface BioResult {
   bios: GeneratedBio[];
-  usernames: string[];
   /** The tone actually used (Auto resolved). */
   tone: Tone;
 }

@@ -10,9 +10,9 @@ import {
 } from './types';
 
 /**
- * Deterministic bio + username engine, ported from the original IG Bio
- * Generator and made seedable so Regenerate rotates through variants. Used
- * as the fallback when Gemini is unavailable and to top up short answers.
+ * Deterministic bio engine, ported from the original IG Bio Generator and
+ * made seedable so Regenerate rotates through variants. Used only as the
+ * fallback when Gemini is unavailable and to top up short answers.
  */
 
 /** Grapheme-aware count so a multi-codepoint emoji counts as one character, like Instagram's counter. */
@@ -226,59 +226,6 @@ export function generateBios(data: BioInput, variant = 0): GeneratedBio[] {
   });
 }
 
-/* ------------------------------- usernames ------------------------------- */
-
-const TYPE_WORDS: Record<string, string[]> = {
-  'Personal Trainer': ['pt', 'trains', 'coach'],
-  'Gym Owner': ['gym', 'strength', 'fit'],
-  'Boutique Studio Owner': ['studio', 'fit', 'movement'],
-  'Online Fitness Coach': ['coach', 'online', 'fit'],
-  'Group Fitness Instructor': ['fit', 'sweat', 'moves'],
-  'Yoga/Pilates Instructor': ['yoga', 'pilates', 'flow'],
-  'CrossFit Coach': ['crossfit', 'wod', 'strong'],
-  'Nutrition Coach': ['nutrition', 'fuel', 'eats'],
-  'Fitness Influencer': ['fit', 'lifts', 'daily'],
-  'Specialized Coach (Martial Arts, Boxing, etc.)': ['coach', 'combat', 'fight'],
-};
-const SPEC_WORDS: Record<string, string> = {
-  'Weight Loss': 'fatloss', 'Muscle Building': 'strength', 'Athletic Performance': 'performance', 'Senior Fitness': 'strongforlife',
-  "Women's Health": 'womenwholift', 'Youth Training': 'youthathletics', 'Injury Recovery': 'movewell', 'Nutrition Coaching': 'fuel',
-  'Mental Health & Fitness': 'mindandmuscle', 'Functional Movement': 'movebetter',
-};
-
-/** Instagram handle rules: lowercase letters, digits, periods and underscores; 3-30 characters; no leading, trailing or doubled periods. */
-export function sanitizeHandle(raw: string): string | null {
-  let h = raw.toLowerCase().trim().replace(/^@/, '').replace(/\s+/g, '.').replace(/[^a-z0-9._]/g, '');
-  h = h.replace(/\.{2,}/g, '.').replace(/_{2,}/g, '_').replace(/^[._]+|[._]+$/g, '');
-  return h.length >= 3 && h.length <= 30 ? h : null;
-}
-
-export function generateUsernames(data: BioInput, variant = 0, count = 8): string[] {
-  const rng = mulberry32(hashString(`u:${JSON.stringify(data)}`) ^ (variant * 0x85ebca6b));
-  const words = data.name.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter((w) => w && !['the', 'and', 'of', 'coaching', 'fitness', 'coach', 'studio', 'gym'].includes(w));
-  const first = words[0] ?? 'coach';
-  const core = words.slice(0, 2).join('') || first;
-  const city = data.location.toLowerCase().replace(/[^a-z0-9]/g, '');
-  const cityOk = city && city !== 'online' && city.length <= 12 ? city : '';
-  const typeWords = data.businessType ? TYPE_WORDS[data.businessType] : ['fit', 'coach'];
-  const kw = data.specializations.length ? SPEC_WORDS[data.specializations[0]] : typeWords[0];
-  const tw = typeWords[Math.floor(rng() * typeWords.length)];
-  const candidates = [
-    `${core}fit`, `coach.${first}`, `${core}.trains`, `train.with.${first}`, `${first}_${kw}`, `${core}.${tw}`,
-    `the${first}method`, `${first}strong`, `${kw}.by.${first}`, `${core}coaching`, `${first}.${tw}`, `${core}_${tw}`,
-    `${first}fitco`, `${first}.${kw}`, `real${first}fit`, `${tw}with${first}`,
-    ...(cityOk ? [`${first}.${cityOk}`, `${cityOk}${kw}`, `${cityOk}.${tw}.${first}`] : []),
-  ];
-  const seen = new Set<string>();
-  const out: string[] = [];
-  for (const c of shuffle(candidates, rng)) {
-    const h = sanitizeHandle(c);
-    if (h && !seen.has(h)) { seen.add(h); out.push(h); }
-    if (out.length >= count) break;
-  }
-  return out;
-}
-
 export function generateBioResult(data: BioInput, variant = 0): BioResult {
-  return { bios: generateBios(data, variant), usernames: generateUsernames(data, variant), tone: resolveTone(data) };
+  return { bios: generateBios(data, variant), tone: resolveTone(data) };
 }

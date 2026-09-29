@@ -442,13 +442,12 @@ const igbio: ToolSpec = {
       tone: str(o.tone, 40) || 'Professional & Credible',
       variant: num(o.variant, 0, 99) ?? 0,
       avoidBios: strings(o.avoidBios, 8, 200),
-      avoidUsernames: strings(o.avoidUsernames, 16, 40),
     };
   },
   prompt(input) {
-    const i = input as { name: string; businessType: string; yearsExperience: string; location: string; specializations: string[]; targetAudience: string; uniqueSellingPoint: string; tone: string; variant: number; avoidBios: string[]; avoidUsernames: string[] };
+    const i = input as { name: string; businessType: string; yearsExperience: string; location: string; specializations: string[]; targetAudience: string; uniqueSellingPoint: string; tone: string; variant: number; avoidBios: string[] };
     return [
-      'You write Instagram bios and username ideas for a fitness professional. Reply with JSON only, matching the schema: {"bios":["...","...","...","..."],"usernames":["...", ...]}.',
+      'You write Instagram bios for a fitness professional. Reply with JSON only, matching the schema: {"bios":["...","...","...","..."]}.',
       '',
       `Name or brand: ${i.name}`,
       `Business type: ${i.businessType}`,
@@ -465,11 +464,7 @@ const igbio: ToolSpec = {
       '- One line, no line breaks, no hashtags, no quotation marks, no em or en dashes. End with one or two fitting emojis, no more.',
       '- Speak to the target audience in the requested tone; weave in the specialisations, the years of experience and the location when given; use the selling point when it is short enough to read cleanly.',
       '- Do not start with the name (the profile shows the name already). No generic filler like "fitness enthusiast" or "living my best life".',
-      'Usernames: exactly 8 Instagram handle ideas based on the name or brand, the niche, the business type and the location.',
-      '- Lowercase letters, digits, periods and underscores only; 3-30 characters; no leading, trailing or doubled periods; no @.',
-      '- Easy to say out loud and type; mix short brand handles with descriptive ones (e.g. coach.sam, samleefit, train.with.sam, samlee.strength); avoid numbers unless they are part of the brand.',
       ...(i.avoidBios.length ? [`- Do not reuse these bios or close variations: ${i.avoidBios.map((b) => `"${b}"`).join(' | ')}`] : []),
-      ...(i.avoidUsernames.length ? [`- Do not reuse these usernames: ${i.avoidUsernames.join(', ')}`] : []),
       ...STYLE_RULES.map((r) => `- ${r}`),
     ].join('\n');
   },
@@ -477,16 +472,14 @@ const igbio: ToolSpec = {
     type: 'OBJECT',
     properties: {
       bios: { type: 'ARRAY', items: { type: 'STRING' } },
-      usernames: { type: 'ARRAY', items: { type: 'STRING' } },
     },
-    required: ['bios', 'usernames'],
+    required: ['bios'],
   },
   normalize(parsed) {
     if (!parsed || typeof parsed !== 'object') return null;
     const o = parsed as Record<string, unknown>;
     const bios = strings(o.bios, 8, 220);
-    const usernames = strings(o.usernames, 16, 40).map((u) => u.replace(/^@/, '').toLowerCase());
-    return bios.length || usernames.length ? { bios, usernames } : null;
+    return bios.length ? { bios } : null;
   },
 };
 

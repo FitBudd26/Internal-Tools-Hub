@@ -108,7 +108,6 @@ const TOOLS: Record<string, ToolConfig> = {
           'tone_preference',
           'generation_count',
           'generated_bios',
-          'generated_usernames',
           'tool_source',
           'campaign',
           'page_url',

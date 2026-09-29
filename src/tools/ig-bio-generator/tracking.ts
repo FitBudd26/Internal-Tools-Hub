@@ -23,7 +23,6 @@ export function trackGeneration(form: BioFormState, result: BioResult, generatio
     tone_preference: result.tone,
     generation_count: String(generationCount),
     generated_bios: result.bios.map((b) => b.text).join('\n'),
-    generated_usernames: result.usernames.join(', '),
     tool_source: TOOL_SOURCE,
     campaign: CAMPAIGN,
     page_url: currentPageUrl(),

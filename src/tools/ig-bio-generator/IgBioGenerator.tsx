@@ -104,7 +104,7 @@ export function IgBioGenerator() {
               <span className="truncate">Instagram Bio Generator</span>
             </h1>
             <p className="mt-1 text-center text-[13px] text-gray-600">
-              Four ready-to-paste bios and username ideas for fitness professionals, in seconds.
+              Four ready-to-paste Instagram bios for fitness professionals, in seconds.
             </p>
           </div>
 
@@ -194,7 +194,7 @@ export function IgBioGenerator() {
                 generating ? 'cursor-wait opacity-80' : 'disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-400'
               }`}
             >
-              {generating ? 'Generating…' : 'Generate Bios and Usernames'}
+              {generating ? 'Generating…' : 'Generate Bios'}
             </button>
             <p className="mt-1 text-center text-xs text-gray-400">Within Instagram's 150-character limit</p>
           </div>

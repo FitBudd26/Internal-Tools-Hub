@@ -10,7 +10,7 @@ tool with its embed snippet.
 | --- | --- | --- | --- |
 | Hashtag Generator | `/hashtag-generator/` | Platform-tailored hashtag sets from a caption (Gemini, with a deterministic fallback), shown in a modal with copy buttons and a CTA | name + email |
 | Fitness Challenge Generator for Coaches & Gyms | `/fitness-challenge-generator/` | Same single-screen design as the Hashtag Generator (dropdowns + name/email) → ready-to-run client challenge framework in the results modal (Gemini with a deterministic fallback), with a branded PDF download and a 30-day-trial CTA | name + email (selections too once its form has the fields) |
-| Instagram Bio Generator | `/ig-bio-generator/` | Migrated from ig-bio-gen.vercel.app into the shared shell: business type, audience, specializations, tone, experience, location and USP → four bios in four angles (authority, results, community, value) within Instagram's 150 characters, plus eight username ideas; Gemini with the original templated engine as fallback | name + email (the original custom fields too once the form has them) |
+| Instagram Bio Generator | `/ig-bio-generator/` | Migrated from ig-bio-gen.vercel.app into the shared shell: business type, audience, specializations, tone, experience, location and USP → four bios in four angles (authority, results, community, value) within Instagram's 150 characters; Gemini with the original templated engine as fallback | name + email (the original custom fields too once the form has them) |
 | Fitness Recipe Generator for Coaches & Gyms | `/recipe-generator/` | Same design → three distinct, goal-aligned recipes that honour every dietary restriction and the coach's notes (Gemini with a 40-recipe library as fallback), approximate nutrition, coach notes, a logo-branded PDF, disclaimer and a free-trial CTA | name + email (selections too once its form has the fields) |
 
 **Stack:** React 19 · TypeScript · Tailwind CSS v4 · Vite (multi-page) ·
@@ -112,8 +112,8 @@ What each tool sends:
 - **Instagram Bio Generator**, `generation` (on Generate): `email`,
   `firstname`, `business_type`, `years_experience`, `location`,
   `specializations`, `target_audience`, `unique_selling_point`,
-  `tone_preference`, `generation_count`, `generated_bios`,
-  `generated_usernames`, `tool_source`, `campaign`, `page_url`,
+  `tone_preference`, `generation_count`, `generated_bios`, `tool_source`,
+  `campaign`, `page_url`,
   `submitted_at`; then `cta_click`. Its form is
   `784af8e3-2341-4478-9ec4-8452914687db`.
 - **Recipe Generator**, `lead` (on Generate Recipes): `email`, `firstname`,
@@ -315,20 +315,18 @@ inputs as before, now in the hub shell: Business Type and Target Audience
 (dropdowns, required), Specializations (multi-select) and Tone (dropdown
 with Auto), Years of Experience and Location, a USP textarea, then Name /
 Business Name and Email. Results open in the shared modal: four bios in
-four angles with a live character count and Copy, eight username ideas as
-tap-to-copy chips with an availability caveat, Regenerate, the free-trial
-CTA and a "Book a free demo" link (the original CTA).
+four angles with a live character count and Copy, Regenerate, the free-trial
+CTA and a "Book a free demo" link (the original CTA). Username ideas are
+deliberately not part of this tool; a separate tool covers them.
 
 - Gemini-first (`aiBios.ts`): the prompt asks for four bios under 140
   characters (headroom under Instagram's 150) in the four angles and the
-  requested tone, plus eight handle ideas that follow Instagram's rules.
-  Every bio is re-counted by grapheme (an emoji is one character), dashes
-  and hashtags are stripped, over-long or duplicate bios are dropped, handles
-  are sanitised, and anything short is topped up from the engine.
+  requested tone. Every bio is re-counted by grapheme (an emoji is one
+  character), dashes and hashtags are stripped, over-long or duplicate bios
+  are dropped, and anything short is topped up from the engine.
 - `generateBios.ts`: the original templated engine, ported unchanged in
   content but made deterministic and seedable (Regenerate rotates variants),
-  with Auto tone inference; plus `generateUsernames`, which builds handles
-  from the name, niche, business type and location.
+  with Auto tone inference. Fallback only.
 
 ## Structure
 
@@ -361,7 +359,7 @@ src/
                                    ChallengePreview, aiChallenge, generateChallenge,
                                    generatePdf, tracking, types
   tools/ig-bio-generator/          IgBioGenerator (form), BioResultsModal, BioCard,
-                                   aiBios, generateBios (+ usernames), tracking, types
+                                   aiBios, generateBios (fallback), tracking, types
   tools/recipe-generator/          RecipeGenerator (form), RecipeModal, RecipeCard,
                                    aiRecipes, generateRecipes (library), nutrition
                                    (estimator + protein rules), calorieTarget,
