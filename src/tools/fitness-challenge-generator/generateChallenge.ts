@@ -310,12 +310,17 @@ export function generateChallenge(input: ChallengeInput): Challenge {
   const level = input.fitnessLevels.join(', ') || 'All levels';
   const duration = `${days} Days`;
 
+  const overview = `A ${days}-day ${focus.toLowerCase()} challenge for ${forLabel.toLowerCase()}: ${dailyRules.length} daily non-negotiables, ${themes.length === 1 ? 'one theme' : `${themes.length} weekly themes`}, an optional scoring system and a day-by-day check-in tracker. It layers on top of your existing training program — no programming changes required.`;
+
   const pdfSections: PdfSection[] = [
-    { heading: 'Challenge Overview', paragraphs: [subtitle, howItWorks] },
+    { heading: 'Challenge Overview', paragraphs: [overview] },
     { heading: 'Designed For', paragraphs: [designedFor, `Level: ${level}`] },
     { heading: 'Duration', paragraphs: [duration] },
     { heading: 'Objective', paragraphs: [objective] },
-    { heading: 'How It Works', paragraphs: ['Participants must complete all required actions to mark a day as complete.'] },
+    {
+      heading: 'How It Works',
+      paragraphs: [howItWorks, 'Participants must complete all required actions to mark a day as complete.'],
+    },
     { heading: 'Daily Challenge Rules', numbered: dailyRules },
     {
       heading: 'Weekly Plan',
