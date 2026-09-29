@@ -92,7 +92,7 @@ const TOOLS: Record<string, ToolConfig> = {
   'ig-bio-generator': {
     pageName: 'Instagram Bio Generator',
     formIdEnv: 'HUBSPOT_FORM_ID_IG_BIO_GENERATOR',
-    defaultFormId: '8ec4d71b-21b7-4639-9849-e47ae5bea96d',
+    defaultFormId: '784af8e3-2341-4478-9ec4-8452914687db',
     events: {
       generation: {
         primary: true,

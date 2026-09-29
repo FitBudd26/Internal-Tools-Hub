@@ -84,7 +84,7 @@ allowed fields to HubSpot's Forms Submission API. Defaults: FitBudd's portal
 `e7410680-1ea2-4f36-8f94-bde4cd94aa62`, Challenge Generator
 `ca6c259d-e274-49fd-8cf0-b5515be51a34`, Recipe Generator
 `b2222d23-1400-4bec-a812-e818740c59f5`, Instagram Bio Generator
-`8ec4d71b-21b7-4639-9849-e47ae5bea96d`. The IDs are public (they appear in
+`784af8e3-2341-4478-9ec4-8452914687db`. The IDs are public (they appear in
 the forms' embed snippets). Nothing HubSpot-related ships in the bundle.
 
 ```
@@ -115,7 +115,7 @@ What each tool sends:
   `tone_preference`, `generation_count`, `generated_bios`,
   `generated_usernames`, `tool_source`, `campaign`, `page_url`,
   `submitted_at`; then `cta_click`. Its form is
-  `8ec4d71b-21b7-4639-9849-e47ae5bea96d`.
+  `784af8e3-2341-4478-9ec4-8452914687db`.
 - **Recipe Generator**, `lead` (on Generate Recipes): `email`, `firstname`,
   `client_goal`, `preferred_protein`, `dietary_preference`, `meal_type`,
   `cooking_time`, `notes`, `generated_recipes`, `tool_source`, `campaign`
