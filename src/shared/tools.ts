@@ -53,6 +53,13 @@ export const TOOLS: ToolMeta[] = [
     fallbackHeight: 760,
   },
   {
+    slug: 'pricing-package-builder',
+    name: 'Pricing & Package Builder',
+    description:
+      'Three coaching packages priced from an income goal, with strategy notes and a revenue projection. The prices come from the tool\'s formula; Gemini writes the packages and notes (built-in copy as fallback). Captures name + email. Migrated from pricing-package-builder.vercel.app.',
+    fallbackHeight: 580,
+  },
+  {
     slug: 'recipe-generator',
     name: 'Fitness Recipe Generator for Coaches & Gyms',
     description:

@@ -91,6 +91,7 @@ export default defineConfig({
         'ig-username-generator': 'ig-username-generator/index.html',
         'gym-name-generator': 'gym-name-generator/index.html',
         'ai-workout-generator': 'ai-workout-generator/index.html',
+        'pricing-package-builder': 'pricing-package-builder/index.html',
       },
     },
   },

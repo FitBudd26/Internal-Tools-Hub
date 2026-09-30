@@ -14,6 +14,7 @@ tool with its embed snippet.
 | Instagram Username Generator | `/ig-username-generator/` | Migrated from ig-username-gen.vercel.app: niche(s), trainer type(s), tone chips and an optional keyword → ten short, brandable handles (lowercase letters, one separator at most, 3-18 characters, no numbers), Copy / Copy All, availability caveat; Gemini with the original engine as fallback | name + email (the original custom fields too once the form has them) |
 | Gym Name Generator | `/gym-name-generator/` | Migrated from gym-name-gen.vercel.app: gym type(s), target audience(s), tone chips and an optional keyword → ten brandable gym names (Title Case, 4-24 characters, at most 4 words, no numbers, no existing gym brands), Copy / Copy All, availability caveat; Gemini with the original engine as fallback | name + email (the selections and names too once the form has the fields) |
 | AI Workout Generator | `/ai-workout-generator/` | Migrated from ai-workout-builder-ten.vercel.app: Guided Mode (client, age, goal, location, intensity, type, duration, target area, notes) or Chat Mode (plain-language description) → a complete single-session plan (warm-up, exercises with sets, reps, rest, cues and modifications, cool-down, progression, weekly split, trainer notes) shown in full, with a branded PDF; Gemini with a built-in workout engine as fallback | email + "Are you a fitness professional?" (the session settings too once the form has the fields) |
+| Pricing & Package Builder | `/pricing-package-builder/` | Migrated from pricing-package-builder.vercel.app: coaching format, niche, experience, services, program duration, income goal, hours and client capacity → three priced packages (Starter, Core, Premium), four strategy notes and a revenue projection, with Copy. The prices and revenue figures come from the tool's formula; Gemini writes the packages and notes around them, with the original copy as fallback | name + email |
 | Fitness Recipe Generator for Coaches & Gyms | `/recipe-generator/` | Same design → three distinct, goal-aligned recipes that honour every dietary restriction and the coach's notes (Gemini with a 40-recipe library as fallback), approximate nutrition, coach notes, a logo-branded PDF, disclaimer and a free-trial CTA | name + email (selections too once its form has the fields) |
 
 **Stack:** React 19 · TypeScript · Tailwind CSS v4 · Vite (multi-page) ·
@@ -90,7 +91,8 @@ allowed fields to HubSpot's Forms Submission API. Defaults: FitBudd's portal
 `784af8e3-2341-4478-9ec4-8452914687db`, Instagram Username Generator
 `8ec4d71b-21b7-4639-9849-e47ae5bea96d`, Gym Name Generator
 `5c18559b-00e9-4c90-8d3e-9769a93e4e47`, AI Workout Generator
-`c50c2e53-ff2e-4d8c-82cd-fd0be0521aa8`. The IDs are public (they appear in
+`c50c2e53-ff2e-4d8c-82cd-fd0be0521aa8`, Pricing & Package Builder
+`2f40041d-360e-47df-a02b-a0d841f37212`. The IDs are public (they appear in
 the forms' embed snippets). Nothing HubSpot-related ships in the bundle.
 
 ```
@@ -103,6 +105,7 @@ HUBSPOT_FORM_ID_IG_BIO_GENERATOR              optional, per-tool form
 HUBSPOT_FORM_ID_IG_USERNAME_GENERATOR         optional, per-tool form
 HUBSPOT_FORM_ID_GYM_NAME_GENERATOR            optional, per-tool form
 HUBSPOT_FORM_ID_AI_WORKOUT_GENERATOR          optional, per-tool form
+HUBSPOT_FORM_ID_PRICING_PACKAGE_BUILDER       optional, per-tool form
 HUBSPOT_PRIVATE_APP_TOKEN                     optional, authenticated secure-submit endpoint
 VITE_TRACK_IN_DEV                             dev only, 'true' sends events from `npm run dev`
 ```
@@ -144,6 +147,16 @@ What each tool sends:
   tool has a consent tick box, so the submission also carries the form's
   consent to process (`consentText` in the tool's config). The client's name
   and the injury notes are never sent.
+- **Pricing & Package Builder**, `lead` (on Generate): `email`, `firstname`,
+  `coaching_format`, `fitness_niche`, `experience_level`, `services_offered`,
+  `program_duration`, `monthly_income_goal`, `hours_per_week`, `max_clients`,
+  `starter_price`, `core_price`, `premium_price`, `tool_source`, `campaign`,
+  `page_url`, `submitted_at`; then `cta_click`. Its form is
+  `2f40041d-360e-47df-a02b-a0d841f37212`, built in HubSpot's newer form
+  editor: the public definition endpoint refuses such forms, so the tool's
+  config lists the form's fields itself (`knownFields`: `email`,
+  `firstname`) and `GET /api/track` reports `formDefinition: "assumed"`.
+  If you add fields to that form in HubSpot, add them to `knownFields` too.
 - **Recipe Generator**, `lead` (on Generate Recipes): `email`, `firstname`,
   `client_goal`, `preferred_protein`, `dietary_preference`, `meal_type`,
   `cooking_time`, `notes`, `generated_recipes`, `tool_source`, `campaign`
@@ -466,6 +479,38 @@ ai-workout-builder-ten.vercel.app) onto the hub's shell and shared routes.
 - No longer needed from the old project: `GEMINI_API_KEY` there, the
   Anthropic / OpenAI provider switches and the Resend email route.
 
+## Pricing & Package Builder
+
+Migrated from the standalone Pricing-package-builder repo (a single
+`index.html` at pricing-package-builder.vercel.app).
+
+- **Same inputs** in the hub shell: Coaching Format, Fitness Niche,
+  Experience, Services Offered (multi-select), Program Duration, Monthly
+  Income Goal, Hours per Week, Max Clients (stepper, 5-100), then Full Name
+  and Email. The old two-tab layout is gone: results open in the shared
+  modal with the summary strip, three package cards (Core marked Most
+  Popular), four strategy notes, the revenue table, Copy, Regenerate, and
+  the original CTA and "See how it works" links with their UTM tags.
+- **The numbers are the tool's own** (`generatePricing.ts`): tier prices,
+  the 30/50/20 client split and the revenue projection are calculated by
+  the formula ported from the old tool. A test runs the old tool's own
+  function against the port for every format, experience, duration, goal
+  and client count and requires identical prices.
+- **Gemini writes the offer** (`aiPricing.ts` + the `pricing` spec in
+  `api/generate.ts`): package names, taglines, who each tier suits, what
+  each tier includes, the delivery line and the four notes. It is given the
+  prices and figures as fixed facts and told to quote nothing else. The
+  answer is checked in the browser: generic or repeated names fall back; a
+  tier never promises a service the coach did not select; each tier offers
+  at least as much as the one below; and a note that quotes a dollar amount
+  or a percentage the tool did not calculate is replaced by the built-in
+  note. The old tool had no AI; its copy is now the fallback.
+- **Group coaching** keeps the old tool's rule: per-member prices with a
+  floor for each tier (45 / 75 / 110), shown as "/member/mo".
+- Two changes to the built-in notes: an invented market benchmark and an
+  unsourced retention statistic were removed, and the shortfall note no
+  longer suggests upgrading more Core clients than exist.
+
 ## Structure
 
 ```
@@ -477,6 +522,7 @@ ig-bio-generator/index.html
 ig-username-generator/index.html
 gym-name-generator/index.html
 ai-workout-generator/index.html
+pricing-package-builder/index.html
 api/
   track.ts                         shared HubSpot route: per-tool form + fields
   generate.ts                      shared Gemini route: hashtags, challenge, recipes
@@ -510,6 +556,9 @@ src/
                                    WorkoutPlanView, aiWorkout, generateWorkout (fallback
                                    engine + chat parser), generatePdf, format, links,
                                    tracking, types
+  tools/pricing-package-builder/   PricingPackageBuilder (form), PricingModal,
+                                   NumberStepper, aiPricing, generatePricing (the pricing
+                                   maths + fallback copy), format, links, tracking, types
   tools/recipe-generator/          RecipeGenerator (form), RecipeModal, RecipeCard,
                                    aiRecipes, generateRecipes (library), nutrition
                                    (estimator + protein rules), calorieTarget,

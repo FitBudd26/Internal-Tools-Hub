@@ -11,7 +11,7 @@
  *   GEMINI_MODEL     optional, defaults to gemini-3.5-flash-lite (free tier,
  *                    fast); gemini-3.8-flash is the higher-quality free option
  *
- * Request body: { tool: 'hashtags' | 'challenge' | 'recipes' | 'igbio' | 'igusername' | 'gymname' | 'workout', ...input }.
+ * Request body: { tool: 'hashtags' | 'challenge' | 'recipes' | 'igbio' | 'igusername' | 'gymname' | 'workout' | 'pricing', ...input }.
  * Each client re-validates what the model returns, so this route only has
  * to return well-formed JSON. Any non-200 answer makes the client fall back
  * to its local engine, so users always get results.
@@ -792,7 +792,149 @@ const workout: ToolSpec = {
   },
 };
 
-const TOOLS: Record<string, ToolSpec> = { hashtags, challenge, recipes, igbio, igusername, gymname, workout };
+/* -------------------------------- pricing --------------------------------- */
+
+const PR = {
+  formats: ['1:1 Online', '1:1 In-Person', 'Hybrid', 'Group', '1:1 + Group'],
+  niches: ['General Fitness', 'Weight Loss/Fat Loss', 'Strength & Powerlifting', 'Bodybuilding/Physique', 'Sports Performance', "Women's Fitness/Pre-Post Natal", 'Yoga/Mobility', 'Functional Fitness/CrossFit', 'Senior Fitness', 'Youth/Athletic Development', 'Rehab/Corrective Exercise', 'Other'],
+  experience: ['Less than 1 year', '1-3 years', '3+ years'],
+  services: ['Workout Programs', 'Nutrition Plans', 'Video Calls', 'Form Check', 'Weekly Check-Ins', 'Messaging Support', 'Progress Tracking', 'Habit Coaching', 'Group Challenges', 'Supplement Guidance'],
+  durations: ['4 weeks', '8 weeks', '12 weeks', 'Ongoing monthly'],
+};
+
+const usd = (n: number): string => `$${n.toLocaleString('en-US')}`;
+
+/**
+ * Pricing & Package Builder. The tool's own formula sets the prices and the
+ * revenue figures and sends them here; Gemini writes the three packages and
+ * the strategy notes around those numbers and may not invent new ones.
+ */
+const pricing: ToolSpec = {
+  maxOutputTokens: 3072,
+  temperature: 0.8,
+  attemptTimeoutMs: 9_000,
+  thinking: { thinkingLevel: 'low' },
+  parse(o) {
+    const coachingFormat = oneOf(o.coachingFormat, PR.formats);
+    const niche = oneOf(o.niche, PR.niches);
+    const experience = oneOf(o.experience, PR.experience);
+    const programDuration = oneOf(o.programDuration, PR.durations);
+    const services = strings(o.services, 10, 40).filter((s) => PR.services.includes(s));
+    const f = (o.figures && typeof o.figures === 'object' ? o.figures : {}) as Record<string, unknown>;
+    const figures = {
+      starter: num(f.starter, 20, 10000),
+      core: num(f.core, 20, 10000),
+      premium: num(f.premium, 20, 20000),
+      starterClients: num(f.starterClients, 1, 100),
+      coreClients: num(f.coreClients, 1, 100),
+      premiumClients: num(f.premiumClients, 1, 100),
+      goal: num(f.goal, 1000, 50000),
+      hours: num(f.hours, 1, 80),
+      maxClients: num(f.maxClients, 5, 100),
+      impliedHourlyRate: num(f.impliedHourlyRate, 1, 5000),
+      raisedCore: num(f.raisedCore, 20, 15000),
+      extraFromRaise: num(f.extraFromRaise, 0, 200000),
+      totalRevenue: num(f.totalRevenue, 1, 2000000),
+      premiumPct: num(f.premiumPct, 1, 100),
+    };
+    const hoursPerClient = typeof f.hoursPerClient === 'number' && f.hoursPerClient > 0 && f.hoursPerClient <= 20 ? Math.round(f.hoursPerClient * 10) / 10 : null;
+    if (!coachingFormat || !niche || !experience || !programDuration || !services.length || hoursPerClient === null || Object.values(figures).some((v) => v === null)) return null;
+    return { coachingFormat, niche, experience, programDuration, services, ...figures, hoursPerClient, isGroup: coachingFormat === 'Group', variant: num(o.variant, 0, 99) ?? 0, avoidNames: strings(o.avoidNames, 9, 40) };
+  },
+  prompt(input) {
+    const i = input as {
+      coachingFormat: string; niche: string; experience: string; programDuration: string; services: string[];
+      starter: number; core: number; premium: number; starterClients: number; coreClients: number; premiumClients: number;
+      goal: number; hours: number; maxClients: number; hoursPerClient: number; impliedHourlyRate: number; raisedCore: number; extraFromRaise: number;
+      totalRevenue: number; premiumPct: number; isGroup: boolean; variant: number; avoidNames: string[];
+    };
+    const per = i.isGroup ? ' per member' : '';
+    const who = i.isGroup ? 'members' : 'clients';
+    const gap = i.goal - i.totalRevenue;
+    return [
+      'You are a pricing strategist for fitness coaches. Write a three-tier coaching package offer and four pricing strategy notes for this coach. Reply with JSON only, matching the schema.',
+      '',
+      'COACH PROFILE',
+      `- Coaching format: ${i.coachingFormat}`,
+      `- Niche: ${i.niche}`,
+      `- Experience: ${i.experience}`,
+      `- Services the coach offers: ${i.services.join(', ')}`,
+      `- Program length: ${i.programDuration}`,
+      `- Monthly income goal: ${usd(i.goal)}`,
+      `- Coaching hours per week: ${i.hours}`,
+      `- Capacity: ${i.maxClients} ${who}`,
+      '',
+      'PRICES AND FIGURES (calculated by the tool; they are fixed and they are the only numbers you may quote)',
+      `- Starter: ${usd(i.starter)} per month${per}, ${i.starterClients} ${who}`,
+      `- Core: ${usd(i.core)} per month${per}, ${i.coreClients} ${who}`,
+      `- Premium: ${usd(i.premium)} per month${per}, ${i.premiumClients} ${who}`,
+      gap > 400
+        ? `- Projected monthly revenue at full capacity: ${usd(i.totalRevenue)}, which is ${usd(gap)} short of the ${usd(i.goal)} goal`
+        : `- Projected monthly revenue at full capacity: ${usd(i.totalRevenue)}, which meets the ${usd(i.goal)} goal`,
+      `- Premium tier share of projected revenue: ${i.premiumPct}%`,
+      `- Hours per ${i.isGroup ? 'member' : 'client'} per week: ${i.hoursPerClient}`,
+      `- Implied coaching rate at the Core price: about ${usd(i.impliedHourlyRate)} per hour`,
+      `- If the Core price were raised by 25%: ${usd(i.raisedCore)} per month, adding ${usd(i.extraFromRaise)} per month at the same ${i.isGroup ? 'member' : 'client'} count`,
+      '',
+      `Variation seed: ${i.variant} (make this offer read differently from other seeds for the same coach).`,
+      '',
+      'PACKAGES (exactly three, in the order starter, core, premium)',
+      `- "tier": "starter", "core" or "premium".`,
+      `- "name": 2-3 words in Title Case that fit the niche and signal the tier. Not Bronze, Silver, Gold, Basic, Standard, Starter, Core or Premium on their own. No numbers and no price.${i.avoidNames.length ? ` Do not reuse: ${i.avoidNames.join(', ')}.` : ''}`,
+      `- "tagline": one outcome-led line, 12 words at most.`,
+      `- "idealFor": one sentence, 22 words at most, describing the client this tier suits.`,
+      `- "includes": starter 3-4 items, core 4-6, premium 5-7. Build them only from the services the coach offers, made concrete with a frequency or a depth ("Weekly check-in", "Two 30-minute video calls per month"). Each higher tier keeps what the tier below has and adds more or deeper service. Premium may also add priority support and a monthly strategy call. Never promise a service the coach does not offer. 8 words at most per item, no prices.`,
+      `- "deliverySummary": 8 words at most on how the tier is delivered for this coaching format${i.coachingFormat === 'Hybrid' ? ' (in-person sessions belong to core and premium only)' : i.isGroup ? ' (group sessions, with smaller groups or extra calls higher up)' : ''}.`,
+      '',
+      'STRATEGY NOTES (exactly four, in this order, each 2-4 sentences and 80 words at most, written to the coach as "you")',
+      '1. Pricing position for this experience level, using the implied hourly rate and the raise scenario.',
+      '2. Capacity: what the hours per client mean for delivery and what to watch as the roster fills.',
+      '3. One lever specific to this format, niche or service mix (tier separation, cohort caps, call limits, nutrition as an upgrade path, seasonal variants and so on).',
+      gap > 400 ? '4. Revenue: the clearest way to close the shortfall with this price list.' : '4. Revenue: how to fill the premium tier, given its share of revenue.',
+      '- Quote only the figures listed above, exactly as written. Do not calculate or invent any other dollar amount, percentage, statistic or market benchmark.',
+      '- Practical and specific to this coach. No hype, no income guarantees.',
+      '',
+      'STYLE',
+      ...STYLE_RULES.map((r) => `- ${r}`),
+    ].join('\n');
+  },
+  schema: {
+    type: 'OBJECT',
+    properties: {
+      packages: {
+        type: 'ARRAY',
+        items: {
+          type: 'OBJECT',
+          properties: {
+            tier: { type: 'STRING' },
+            name: { type: 'STRING' },
+            tagline: { type: 'STRING' },
+            idealFor: { type: 'STRING' },
+            includes: { type: 'ARRAY', items: { type: 'STRING' } },
+            deliverySummary: { type: 'STRING' },
+          },
+          required: ['tier', 'name', 'tagline', 'idealFor', 'includes', 'deliverySummary'],
+        },
+      },
+      strategyNotes: { type: 'ARRAY', items: { type: 'STRING' } },
+    },
+    required: ['packages', 'strategyNotes'],
+  },
+  normalize(parsed) {
+    if (!parsed || typeof parsed !== 'object') return null;
+    const o = parsed as { packages?: unknown; strategyNotes?: unknown };
+    const packages = (Array.isArray(o.packages) ? o.packages : [])
+      .filter((x): x is Record<string, unknown> => Boolean(x) && typeof x === 'object')
+      .map((x) => ({ tier: str(x.tier, 12).toLowerCase(), name: str(x.name, 60), tagline: str(x.tagline, 160), idealFor: str(x.idealFor, 260), includes: strings(x.includes, 9, 90), deliverySummary: str(x.deliverySummary, 120) }))
+      .filter((x) => x.name && x.includes.length >= 2)
+      .slice(0, 3);
+    const strategyNotes = strings(o.strategyNotes, 5, 900);
+    if (packages.length < 3 || strategyNotes.length < 1) return null;
+    return { packages, strategyNotes };
+  },
+};
+
+const TOOLS: Record<string, ToolSpec> = { hashtags, challenge, recipes, igbio, igusername, gymname, workout, pricing };
 
 /* -------------------------------- handler -------------------------------- */
 

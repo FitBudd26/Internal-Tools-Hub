@@ -43,6 +43,11 @@ interface ToolConfig {
   defaultFormId: string;
   /** When the tool collects consent with a tick box, the wording sent as the form's consent to process. */
   consentText?: string;
+  /**
+   * The form's fields, for forms built in HubSpot's newer editor: their definition cannot be read
+   * from the public endpoint, so without this list every declared field would be sent and rejected.
+   */
+  knownFields?: string[];
   events: Record<string, EventSpec>;
 }
 
@@ -172,6 +177,22 @@ const TOOLS: Record<string, ToolConfig> = {
       },
     },
   },
+  'pricing-package-builder': {
+    pageName: 'Pricing & Package Builder',
+    formIdEnv: 'HUBSPOT_FORM_ID_PRICING_PACKAGE_BUILDER',
+    defaultFormId: '2f40041d-360e-47df-a02b-a0d841f37212',
+    knownFields: ['email', 'firstname'],
+    events: {
+      lead: {
+        primary: true,
+        fields: ['email', 'firstname', 'coaching_format', 'fitness_niche', 'experience_level', 'services_offered', 'program_duration', 'monthly_income_goal', 'hours_per_week', 'max_clients', 'starter_price', 'core_price', 'premium_price', 'tool_source', 'campaign', 'page_url', 'submitted_at'],
+      },
+      cta_click: {
+        primary: false,
+        fields: ['email', 'cta_clicked', 'cta_text', 'cta_url', 'cta_clicked_at', 'tool_source', 'page_url'],
+      },
+    },
+  },
   'recipe-generator': {
     pageName: 'Recipe Generator',
     formIdEnv: 'HUBSPOT_FORM_ID_RECIPE_GENERATOR',
@@ -287,6 +308,17 @@ async function getFormShape(portalId: string, formId: string): Promise<FormShape
 
 const warned = new Set<string>();
 /** Once per tool/form per instance: say what the form lacks, the usual reason tracking "doesn't work". */
+/**
+ * The form's fields: read from HubSpot when possible, otherwise the tool's own list for forms
+ * whose definition is not public (HubSpot's newer form editor), otherwise unknown.
+ */
+async function shapeFor(cfg: ToolConfig, portalId: string, formId: string): Promise<{ shape: FormShape | null; source: 'read' | 'assumed' | 'unknown' }> {
+  const read = await getFormShape(portalId, formId);
+  if (read) return { shape: read, source: 'read' };
+  if (cfg.knownFields) return { shape: { names: new Set(cfg.knownFields), required: [] }, source: 'assumed' };
+  return { shape: null, source: 'unknown' };
+}
+
 function warnOnce(tool: string, formId: string, cfg: ToolConfig, shape: FormShape) {
   const key = `${tool}/${formId}`;
   if (warned.has(key)) return;
@@ -318,12 +350,13 @@ export default async function handler(
     const tools: Record<string, unknown> = {};
     for (const [slug, cfg] of Object.entries(TOOLS)) {
       const { portalId, formId, token } = resolveForm(cfg);
-      const shape = await getFormShape(portalId, formId);
+      const { shape, source } = await shapeFor(cfg, portalId, formId);
       const all = toolFields(cfg);
       tools[slug] = {
         portalId,
         formId,
         authenticated: Boolean(token),
+        formDefinition: source,
         formFields: shape ? [...shape.names] : null,
         missingFields: shape ? all.filter((n) => !shape.names.has(n)) : null,
         requiredButNeverSent: shape ? shape.required.filter((n) => !all.includes(n)) : null,
@@ -361,7 +394,7 @@ export default async function handler(
 
       // Only fields the form defines, HubSpot rejects the whole submission
       // otherwise (FIELD_NOT_IN_FORM_DEFINITION).
-      const shape = await getFormShape(portalId, formId);
+      const { shape } = await shapeFor(cfg, portalId, formId);
       if (shape) warnOnce(tool, formId, cfg, shape);
       const sendable = shape ? hsFields.filter((f) => shape.names.has(f.name)) : hsFields;
       const addsData = sendable.some((f) => f.name !== 'email');
