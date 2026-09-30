@@ -60,6 +60,13 @@ export const TOOLS: ToolMeta[] = [
     fallbackHeight: 580,
   },
   {
+    slug: 'one-rep-max-calculator',
+    name: 'One Rep Max Calculator',
+    description:
+      'A 1RM estimate from six formulas with a training load chart. The numbers are formulas; Gemini adds a read on the estimate, a warm-up, a four-week plan and tips (built-in guidance as fallback). Captures email. Migrated from 1-rpm-calculator.vercel.app.',
+    fallbackHeight: 580,
+  },
+  {
     slug: 'recipe-generator',
     name: 'Fitness Recipe Generator for Coaches & Gyms',
     description:

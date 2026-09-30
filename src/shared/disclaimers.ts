@@ -7,3 +7,6 @@ export const CHALLENGE_DISCLAIMER =
 
 export const WORKOUT_DISCLAIMER =
   'This plan is general fitness guidance, not medical advice, and it does not diagnose or treat any injury or condition. Coaches should review and adapt it to each client\'s health status, training history and limitations before use. Stop the session and consult a qualified professional if there is pain, dizziness or any unusual symptom.';
+
+export const ONE_RM_DISCLAIMER =
+  'A one rep max from a formula is an estimate, and the training guidance is general coaching information, not medical advice. Coaches should adapt loads to each client\'s training history, technique and health, use spotters or safety equipment for heavy sets, and stop a session if there is pain or any unusual symptom.';

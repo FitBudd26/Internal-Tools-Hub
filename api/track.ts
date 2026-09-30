@@ -193,6 +193,23 @@ const TOOLS: Record<string, ToolConfig> = {
       },
     },
   },
+  'one-rep-max-calculator': {
+    pageName: 'One Rep Max Calculator',
+    formIdEnv: 'HUBSPOT_FORM_ID_ONE_REP_MAX_CALCULATOR',
+    defaultFormId: '185118b9-abb4-4332-b08e-3af075979186',
+    // Built in HubSpot's newer form editor; the standalone calculator sent the email alone.
+    knownFields: ['email'],
+    events: {
+      lead: {
+        primary: true,
+        fields: ['email', 'calculator_exercise', 'calculator_1rm_result', 'calculator_unit', 'lead_source', 'tool_source', 'page_url', 'submitted_at'],
+      },
+      cta_click: {
+        primary: false,
+        fields: ['email', 'cta_clicked', 'cta_text', 'cta_url', 'cta_clicked_at', 'tool_source', 'page_url'],
+      },
+    },
+  },
   'recipe-generator': {
     pageName: 'Recipe Generator',
     formIdEnv: 'HUBSPOT_FORM_ID_RECIPE_GENERATOR',

@@ -92,6 +92,7 @@ export default defineConfig({
         'gym-name-generator': 'gym-name-generator/index.html',
         'ai-workout-generator': 'ai-workout-generator/index.html',
         'pricing-package-builder': 'pricing-package-builder/index.html',
+        'one-rep-max-calculator': 'one-rep-max-calculator/index.html',
       },
     },
   },

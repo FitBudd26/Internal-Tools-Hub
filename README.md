@@ -15,6 +15,7 @@ tool with its embed snippet.
 | Gym Name Generator | `/gym-name-generator/` | Migrated from gym-name-gen.vercel.app: gym type(s), target audience(s), tone chips and an optional keyword → ten brandable gym names (Title Case, 4-24 characters, at most 4 words, no numbers, no existing gym brands), Copy / Copy All, availability caveat; Gemini with the original engine as fallback | name + email (the selections and names too once the form has the fields) |
 | AI Workout Generator | `/ai-workout-generator/` | Migrated from ai-workout-builder-ten.vercel.app: Guided Mode (client, age, goal, location, intensity, type, duration, target area, notes) or Chat Mode (plain-language description) → a complete single-session plan (warm-up, exercises with sets, reps, rest, cues and modifications, cool-down, progression, weekly split, trainer notes) shown in full, with a branded PDF; Gemini with a built-in workout engine as fallback | email + "Are you a fitness professional?" (the session settings too once the form has the fields) |
 | Pricing & Package Builder | `/pricing-package-builder/` | Migrated from pricing-package-builder.vercel.app: coaching format, niche, experience, services, program duration, income goal, hours and client capacity → three priced packages (Starter, Core, Premium), four strategy notes and a revenue projection, with Copy. The prices and revenue figures come from the tool's formula; Gemini writes the packages and notes around them, with the original copy as fallback | name + email |
+| One Rep Max Calculator | `/one-rep-max-calculator/` | Migrated from 1-rpm-calculator.vercel.app: exercise, weight (lbs or kg), reps and an optional training goal → the 1RM estimate (Epley), a six-formula comparison and the training load chart, all from formulas, plus guidance from Gemini: a read on the estimate, a warm-up ramp, a four-week plan and coaching tips, with built-in guidance as fallback | email |
 | Fitness Recipe Generator for Coaches & Gyms | `/recipe-generator/` | Same design → three distinct, goal-aligned recipes that honour every dietary restriction and the coach's notes (Gemini with a 40-recipe library as fallback), approximate nutrition, coach notes, a logo-branded PDF, disclaimer and a free-trial CTA | name + email (selections too once its form has the fields) |
 
 **Stack:** React 19 · TypeScript · Tailwind CSS v4 · Vite (multi-page) ·
@@ -92,7 +93,8 @@ allowed fields to HubSpot's Forms Submission API. Defaults: FitBudd's portal
 `8ec4d71b-21b7-4639-9849-e47ae5bea96d`, Gym Name Generator
 `5c18559b-00e9-4c90-8d3e-9769a93e4e47`, AI Workout Generator
 `c50c2e53-ff2e-4d8c-82cd-fd0be0521aa8`, Pricing & Package Builder
-`2f40041d-360e-47df-a02b-a0d841f37212`. The IDs are public (they appear in
+`2f40041d-360e-47df-a02b-a0d841f37212`, One Rep Max Calculator
+`185118b9-abb4-4332-b08e-3af075979186`. The IDs are public (they appear in
 the forms' embed snippets). Nothing HubSpot-related ships in the bundle.
 
 ```
@@ -106,6 +108,7 @@ HUBSPOT_FORM_ID_IG_USERNAME_GENERATOR         optional, per-tool form
 HUBSPOT_FORM_ID_GYM_NAME_GENERATOR            optional, per-tool form
 HUBSPOT_FORM_ID_AI_WORKOUT_GENERATOR          optional, per-tool form
 HUBSPOT_FORM_ID_PRICING_PACKAGE_BUILDER       optional, per-tool form
+HUBSPOT_FORM_ID_ONE_REP_MAX_CALCULATOR        optional, per-tool form
 HUBSPOT_PRIVATE_APP_TOKEN                     optional, authenticated secure-submit endpoint
 VITE_TRACK_IN_DEV                             dev only, 'true' sends events from `npm run dev`
 ```
@@ -157,6 +160,14 @@ What each tool sends:
   config lists the form's fields itself (`knownFields`: `email`,
   `firstname`) and `GET /api/track` reports `formDefinition: "assumed"`.
   If you add fields to that form in HubSpot, add them to `knownFields` too.
+- **One Rep Max Calculator**, `lead` (on Calculate): `email`,
+  `calculator_exercise`, `calculator_1rm_result`, `calculator_unit`,
+  `lead_source` (`1rm_calculator`), `tool_source`, `page_url`,
+  `submitted_at`; then `cta_click`. Its form is
+  `185118b9-abb4-4332-b08e-3af075979186`, also from the newer editor, with
+  `knownFields: email` because the standalone calculator sent the email
+  alone. Add the calculator fields to the form and to `knownFields` to
+  record them.
 - **Recipe Generator**, `lead` (on Generate Recipes): `email`, `firstname`,
   `client_goal`, `preferred_protein`, `dietary_preference`, `meal_type`,
   `cooking_time`, `notes`, `generated_recipes`, `tool_source`, `campaign`
@@ -511,6 +522,35 @@ Migrated from the standalone Pricing-package-builder repo (a single
   unsourced retention statistic were removed, and the shortfall note no
   longer suggests upgrading more Core clients than exist.
 
+## One Rep Max Calculator
+
+Migrated from the standalone 1RPM-Calculator repo (a single `index.html` at
+1-rpm-calculator.vercel.app).
+
+- **Inputs**: Exercise (Bench Press preselected), Weight Lifted with a
+  lbs / kg toggle, Reps Completed (1 to 12 and 15, now a dropdown), an
+  optional Training Goal (new, it only shapes the guidance) and Email. The
+  old tool showed blurred results and asked for the email to unlock them;
+  here the email is on the form and the results open in the shared modal.
+- **The numbers are formulas** (`calculate.ts`): Epley as the headline, the
+  comparison across Epley, Brzycki, Lombardi, Mayhew, O'Conner and Wathan
+  with highest, lowest and average, and the ten-zone training load chart. A
+  test runs the old tool's own function against the port for 13,000 sets
+  and requires identical results, and the old README's six verification
+  cases are checked too. One rep lifted is shown as a true max, and sets
+  above 12 reps carry the accuracy note.
+- **Gemini adds the guidance** (`aiGuidance.ts` + the `onerm` spec in
+  `api/generate.ts`): a two-sentence read on how far to trust the estimate,
+  a warm-up ramp, a four-week plan for the lift and three coaching tips. It
+  answers in percentages of the max and the tool turns them into weights
+  (nearest 5 lbs or 2.5 kg). The answer is checked in the browser: reps
+  must be possible at the percentage (ten reps at 90 percent replaces the
+  whole plan), the warm-up must climb and stay below the working sets, and
+  the text may quote only weights the formulas produced. The old tool had
+  no AI; `generateGuidance.ts` is the fallback.
+- Copy Results, Regenerate guidance and Recalculate; the original CTA and
+  "Powered by FitBudd" links with their UTM tags; a disclaimer.
+
 ## Structure
 
 ```
@@ -523,6 +563,7 @@ ig-username-generator/index.html
 gym-name-generator/index.html
 ai-workout-generator/index.html
 pricing-package-builder/index.html
+one-rep-max-calculator/index.html
 api/
   track.ts                         shared HubSpot route: per-tool form + fields
   generate.ts                      shared Gemini route: hashtags, challenge, recipes
@@ -531,7 +572,7 @@ src/
     index.css                      Tailwind theme (FitBudd colours) + iframe rules
     tools.ts                       tool registry + Webflow embed snippet
     logo.ts                        FitBudd logo as base64 PNG (for PDFs)
-    disclaimers.ts                 recipe, challenge and workout disclaimers
+    disclaimers.ts                 recipe, challenge, workout and one rep max disclaimers
     components/                    SelectDropdown, MultiSelectDropdown, MultiSelectChips
                                    (≤5 options only), ToolModal, PdfDownloadButton,
                                    CTASection, HashMark, ToolMark, InstagramMark,
@@ -559,6 +600,9 @@ src/
   tools/pricing-package-builder/   PricingPackageBuilder (form), PricingModal,
                                    NumberStepper, aiPricing, generatePricing (the pricing
                                    maths + fallback copy), format, links, tracking, types
+  tools/one-rep-max-calculator/    OneRepMaxCalculator (form), OneRepMaxModal, calculate
+                                   (formulas + load chart), aiGuidance, generateGuidance
+                                   (fallback), format, links, tracking, types
   tools/recipe-generator/          RecipeGenerator (form), RecipeModal, RecipeCard,
                                    aiRecipes, generateRecipes (library), nutrition
                                    (estimator + protein rules), calorieTarget,

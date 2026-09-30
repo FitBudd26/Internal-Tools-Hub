@@ -11,7 +11,7 @@
  *   GEMINI_MODEL     optional, defaults to gemini-3.5-flash-lite (free tier,
  *                    fast); gemini-3.8-flash is the higher-quality free option
  *
- * Request body: { tool: 'hashtags' | 'challenge' | 'recipes' | 'igbio' | 'igusername' | 'gymname' | 'workout' | 'pricing', ...input }.
+ * Request body: { tool: 'hashtags' | 'challenge' | 'recipes' | 'igbio' | 'igusername' | 'gymname' | 'workout' | 'pricing' | 'onerm', ...input }.
  * Each client re-validates what the model returns, so this route only has
  * to return well-formed JSON. Any non-200 answer makes the client fall back
  * to its local engine, so users always get results.
@@ -936,7 +936,118 @@ const pricing: ToolSpec = {
   },
 };
 
-const TOOLS: Record<string, ToolSpec> = { hashtags, challenge, recipes, igbio, igusername, gymname, workout, pricing };
+/* ------------------------------ one rep max ------------------------------- */
+
+const RM = {
+  exercises: ['Bench Press', 'Squat', 'Deadlift', 'Overhead Press', 'Barbell Row', 'Other'],
+  reps: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 15],
+  goals: ['Strength', 'Muscle Building', 'Endurance', 'General Fitness'],
+};
+
+/** The same six formulas the calculator shows, so the facts in the prompt are the tool's own. */
+function oneRmFacts(weight: number, reps: number): { oneRm: number; low: number; high: number; average: number } {
+  if (reps === 1) return { oneRm: weight, low: weight, high: weight, average: weight };
+  const all = [
+    Math.round(weight * (1 + reps / 30)),
+    Math.round((weight * 36) / (37 - reps)),
+    Math.round(weight * Math.pow(reps, 0.1)),
+    Math.round((100 * weight) / (52.2 + 41.9 * Math.exp(-0.055 * reps))),
+    Math.round(weight * (1 + reps / 40)),
+    Math.round((100 * weight) / (48.8 + 53.8 * Math.exp(-0.075 * reps))),
+  ];
+  return { oneRm: all[0], low: Math.min(...all), high: Math.max(...all), average: Math.round(all.reduce((a, b) => a + b, 0) / all.length) };
+}
+
+/**
+ * One Rep Max Calculator. The estimate, the formula comparison and the
+ * training chart are the calculator's own maths. Gemini adds the coaching
+ * layer in percentages of the max; the browser turns them into weights.
+ */
+const onerm: ToolSpec = {
+  maxOutputTokens: 2048,
+  temperature: 0.7,
+  attemptTimeoutMs: 9_000,
+  thinking: { thinkingLevel: 'low' },
+  parse(o) {
+    const exercise = oneOf(o.exercise, RM.exercises);
+    const unit = oneOf(o.unit, ['lbs', 'kg']);
+    const reps = num(o.reps, 1, 15);
+    const weight = typeof o.weight === 'number' && o.weight >= 1 && o.weight <= 9999 ? Math.round(o.weight * 10) / 10 : null;
+    if (!exercise || !unit || weight === null || reps === null || !RM.reps.includes(reps)) return null;
+    return { exercise, unit, weight, reps, goal: oneOf(o.goal, RM.goals), variant: num(o.variant, 0, 99) ?? 0 };
+  },
+  prompt(input) {
+    const i = input as { exercise: string; unit: string; weight: number; reps: number; goal: string; variant: number };
+    const f = oneRmFacts(i.weight, i.reps);
+    const lift = i.exercise === 'Other' ? 'a barbell or machine lift (not named)' : i.exercise;
+    const goal = i.goal || 'Strength';
+    return [
+      'You are a strength coach helping another coach program one lift for a client from a one rep max estimate. Reply with JSON only, matching the schema.',
+      '',
+      'THE LIFT (facts from the calculator; they are fixed)',
+      `- Exercise: ${lift}`,
+      `- Best set: ${i.weight} ${i.unit} for ${i.reps} ${i.reps === 1 ? 'rep' : 'reps'}`,
+      i.reps === 1
+        ? `- One rep max: ${f.oneRm} ${i.unit}. It was lifted for a single, so it is a true max, not an estimate.`
+        : `- Estimated one rep max (Epley): ${f.oneRm} ${i.unit}`,
+      ...(i.reps === 1 ? [] : [`- Range across six formulas: ${f.low} to ${f.high} ${i.unit}, average ${f.average} ${i.unit}`]),
+      '- Estimates are most reliable from sets of 2 to 10 reps; above 10 reps they drift.',
+      `- Training goal for the next block: ${goal}${i.goal ? '' : ' (not stated, so assume strength)'}`,
+      '',
+      `Variation seed: ${i.variant} (make this guidance read differently from other seeds for the same lift).`,
+      '',
+      'WHAT TO WRITE',
+      `- "summary": two sentences, 45 words at most: what this number tells the coach and how far to trust it at this rep count. You may quote the best set, the one rep max and the formula range exactly as given, and no other weight.`,
+      `- "warmup": 4 or 5 steps ramping to the first working set of week 1. Each step has "percent" (of the one rep max, 30 to 80, rising every step) and "reps" (falling or level as the load rises).`,
+      `- "plan": exactly four weeks progressing this lift for the goal, in order. Each week has "week" (1 to 4), "focus" (2 to 4 words), "sets" (2 to 6), "reps" (one number such as "5", or a range such as "3-5"), "percent" (of the one rep max, 50 to 95, in steps of 2.5) and "note" (one sentence, 18 words at most, a cue or a rule for that week). Week 4 is a deload or a retest.`,
+      `- The reps must be possible at the percentage: about 1-2 reps at 95, 3-4 at 90, 4-6 at 85, 6-8 at 80, 8-10 at 75, 10-12 at 70, 12-15 at 65, up to 20 at 60 or below.`,
+      `- The plan must fit the goal: Strength works mostly at 75 to 90 percent for 3-6 reps; Muscle Building at 62.5 to 77.5 for 6-12; Endurance at 50 to 65 for 12-20; General Fitness at 65 to 80 for 6-10.`,
+      `- "tips": exactly three coaching tips for this exercise, 22 words at most each: one technique cue, one on programming or retesting, one on safety.`,
+      `- Percentages only. Never write a weight in ${i.unit} in the warm-up, the plan or the tips: the tool turns every percentage into a weight.`,
+      '- No medical advice and no promises of results.',
+      '',
+      'STYLE',
+      ...STYLE_RULES.map((r) => `- ${r}`),
+    ].join('\n');
+  },
+  schema: {
+    type: 'OBJECT',
+    properties: {
+      summary: { type: 'STRING' },
+      warmup: { type: 'ARRAY', items: { type: 'OBJECT', properties: { percent: { type: 'NUMBER' }, reps: { type: 'INTEGER' } }, required: ['percent', 'reps'] } },
+      plan: {
+        type: 'ARRAY',
+        items: {
+          type: 'OBJECT',
+          properties: { week: { type: 'INTEGER' }, focus: { type: 'STRING' }, sets: { type: 'INTEGER' }, reps: { type: 'STRING' }, percent: { type: 'NUMBER' }, note: { type: 'STRING' } },
+          required: ['week', 'focus', 'sets', 'reps', 'percent', 'note'],
+        },
+      },
+      tips: { type: 'ARRAY', items: { type: 'STRING' } },
+    },
+    required: ['summary', 'warmup', 'plan', 'tips'],
+  },
+  normalize(parsed) {
+    if (!parsed || typeof parsed !== 'object') return null;
+    const o = parsed as Record<string, unknown>;
+    const list = (v: unknown): Record<string, unknown>[] => (Array.isArray(v) ? v.filter((x): x is Record<string, unknown> => Boolean(x) && typeof x === 'object') : []);
+    const number = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null);
+    const guidance = {
+      summary: str(o.summary, 400),
+      warmup: list(o.warmup).map((x) => ({ percent: number(x.percent), reps: number(x.reps) })).slice(0, 6),
+      plan: list(o.plan)
+        .map((x) => ({ week: number(x.week), focus: str(x.focus, 40), sets: number(x.sets), reps: str(x.reps, 10), percent: number(x.percent), note: str(x.note, 200) }))
+        .sort((a, b) => (a.week ?? 99) - (b.week ?? 99))
+        .slice(0, 4),
+      tips: strings(o.tips, 4, 240),
+    };
+    // Usable if any part is there; the browser checks each part and fills the rest.
+    if (!guidance.summary && guidance.plan.length < 4 && guidance.tips.length < 2) return null;
+    return { guidance };
+  },
+};
+
+const TOOLS: Record<string, ToolSpec> = { hashtags, challenge, recipes, igbio, igusername, gymname, workout, pricing, onerm };
 
 /* -------------------------------- handler -------------------------------- */
 
