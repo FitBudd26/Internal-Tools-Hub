@@ -89,6 +89,7 @@ export default defineConfig({
         'recipe-generator': 'recipe-generator/index.html',
         'ig-bio-generator': 'ig-bio-generator/index.html',
         'ig-username-generator': 'ig-username-generator/index.html',
+        'gym-name-generator': 'gym-name-generator/index.html',
       },
     },
   },

@@ -11,7 +11,7 @@
  *   GEMINI_MODEL     optional, defaults to gemini-3.5-flash-lite (free tier,
  *                    fast); gemini-3.8-flash is the higher-quality free option
  *
- * Request body: { tool: 'hashtags' | 'challenge' | 'recipes' | 'igbio' | 'igusername', ...input }.
+ * Request body: { tool: 'hashtags' | 'challenge' | 'recipes' | 'igbio' | 'igusername' | 'gymname', ...input }.
  * Each client re-validates what the model returns, so this route only has
  * to return well-formed JSON. Any non-200 answer makes the client fall back
  * to its local engine, so users always get results.
@@ -536,7 +536,62 @@ const igusername: ToolSpec = {
   },
 };
 
-const TOOLS: Record<string, ToolSpec> = { hashtags, challenge, recipes, igbio, igusername };
+/* -------------------------------- gym names ------------------------------- */
+
+const gymname: ToolSpec = {
+  maxOutputTokens: 1024,
+  parse(o) {
+    const gymTypes = strings(o.gymTypes, 12, 40);
+    const audiences = strings(o.audiences, 10, 40);
+    if (!gymTypes.length || !audiences.length) return null;
+    return {
+      fullName: str(o.fullName, 80),
+      gymTypes,
+      audiences,
+      tones: strings(o.tones, 5, 20),
+      keyword: str(o.keyword, 30),
+      variant: num(o.variant, 0, 99) ?? 0,
+      avoid: strings(o.avoid, 30, 40),
+    };
+  },
+  prompt(input) {
+    const i = input as { fullName: string; gymTypes: string[]; audiences: string[]; tones: string[]; keyword: string; variant: number; avoid: string[] };
+    return [
+      'You name gyms and fitness studios. Reply with JSON only, matching the schema: {"names":["...", ...]}.',
+      '',
+      `Gym type / focus: ${i.gymTypes.join(', ')}`,
+      `Target audience: ${i.audiences.join(', ')}`,
+      `Tone / style: ${i.tones.join(', ') || 'Professional'}`,
+      `Owner name: ${i.fullName || 'not given'}`,
+      `Keyword to build into some names: ${i.keyword || 'none'}`,
+      `Variation seed: ${i.variant} (make this set read differently from other seeds for the same inputs).`,
+      '',
+      'Return exactly 16 candidate business names (the best 10 are kept):',
+      '- Title Case, 4-24 characters, at most 4 words, letters and spaces only. No numbers, hyphens, ampersands or symbols. One possessive apostrophe is fine, and a name may end in "Co.".',
+      '- Original and brandable: easy to say, spell and put on a sign. Every name must fit the gym type and speak to the audience.',
+      '- Never use or imitate an existing gym brand (Gold\'s Gym, Planet Fitness, Anytime Fitness, Equinox, Crunch, Orangetheory, Barry\'s, F45, Snap Fitness, SoulCycle, Curves, YMCA, World Gym, LA Fitness, Life Time, PureGym, Virgin Active, Fitness First, Blink) and never use FitBudd.',
+      '- No filler words: Best, Ultimate, Xtreme, Extreme, Number One.',
+      '- Vary the formats across the set: noun + descriptor (Forge Athletics), "The ... Yard/Room/Den" (The Iron Yard), one-word compounds (GritHouse), "House of ..." (House of Grit), evocative two-word names (Summit Strength), and at most two names built on the owner\'s last name (Rivera Strength, The Rivera Method).',
+      '- Keep the set varied: no single word in more than two names, no mirror pairs (Iron Summit and Summit Iron), no two names that differ only by the last word.',
+      ...(i.keyword ? [`- Use the keyword "${i.keyword}" in three or four of the names, where it reads naturally.`] : []),
+      '- Match the tone: Professional is clean and credible (Apex Performance), Trendy is modern and social (The Sweat Society), Playful is warm and fun (The Hustle Shack), Minimalist is one or two short words (Forge, Pure Motion), Unique is unexpected (The Iron Foundry, Anvil Republic).',
+      ...(i.avoid.length ? [`- Do not return these or trivial variations of them: ${i.avoid.join(', ')}`] : []),
+      '- Trademark, domain and business-register availability cannot be checked here; do not claim any name is available.',
+    ].join('\n');
+  },
+  schema: {
+    type: 'OBJECT',
+    properties: { names: { type: 'ARRAY', items: { type: 'STRING' } } },
+    required: ['names'],
+  },
+  normalize(parsed) {
+    if (!parsed || typeof parsed !== 'object') return null;
+    const names = strings((parsed as { names?: unknown }).names, 24, 40);
+    return names.length ? { names } : null;
+  },
+};
+
+const TOOLS: Record<string, ToolSpec> = { hashtags, challenge, recipes, igbio, igusername, gymname };
 
 /* -------------------------------- handler -------------------------------- */
 

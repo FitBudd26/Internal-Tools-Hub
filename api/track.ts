@@ -135,6 +135,21 @@ const TOOLS: Record<string, ToolConfig> = {
       },
     },
   },
+  'gym-name-generator': {
+    pageName: 'Gym Name Generator',
+    formIdEnv: 'HUBSPOT_FORM_ID_GYM_NAME_GENERATOR',
+    defaultFormId: '5c18559b-00e9-4c90-8d3e-9769a93e4e47',
+    events: {
+      generation: {
+        primary: true,
+        fields: ['email', 'firstname', 'gym_types', 'target_audiences', 'tone_styles', 'keyword', 'generated_gym_names', 'source', 'tool_source', 'campaign', 'page_url', 'submitted_at'],
+      },
+      cta_click: {
+        primary: false,
+        fields: ['email', 'cta_clicked', 'cta_text', 'cta_url', 'cta_clicked_at', 'tool_source', 'page_url'],
+      },
+    },
+  },
   'recipe-generator': {
     pageName: 'Recipe Generator',
     formIdEnv: 'HUBSPOT_FORM_ID_RECIPE_GENERATOR',

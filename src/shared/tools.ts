@@ -38,6 +38,13 @@ export const TOOLS: ToolMeta[] = [
     fallbackHeight: 580,
   },
   {
+    slug: 'gym-name-generator',
+    name: 'Gym Name Generator',
+    description:
+      'Ten brandable gym names from gym type, audience, tone and an optional keyword (Gemini with the original engine as fallback). Captures name + email. Migrated from gym-name-gen.vercel.app.',
+    fallbackHeight: 580,
+  },
+  {
     slug: 'recipe-generator',
     name: 'Fitness Recipe Generator for Coaches & Gyms',
     description:

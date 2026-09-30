@@ -12,6 +12,7 @@ tool with its embed snippet.
 | Fitness Challenge Generator for Coaches & Gyms | `/fitness-challenge-generator/` | Same single-screen design as the Hashtag Generator (dropdowns + name/email) → ready-to-run client challenge framework in the results modal (Gemini with a deterministic fallback), with a branded PDF download and a 30-day-trial CTA | name + email (selections too once its form has the fields) |
 | Instagram Bio Generator | `/ig-bio-generator/` | Migrated from ig-bio-gen.vercel.app into the shared shell: business type, audience, specializations, tone, experience, location and USP → four bios in four angles (authority, results, community, value) within Instagram's 150 characters; Gemini with the original templated engine as fallback | name + email (the original custom fields too once the form has them) |
 | Instagram Username Generator | `/ig-username-generator/` | Migrated from ig-username-gen.vercel.app: niche(s), trainer type(s), tone chips and an optional keyword → ten short, brandable handles (lowercase letters, one separator at most, 3-18 characters, no numbers), Copy / Copy All, availability caveat; Gemini with the original engine as fallback | name + email (the original custom fields too once the form has them) |
+| Gym Name Generator | `/gym-name-generator/` | Migrated from gym-name-gen.vercel.app: gym type(s), target audience(s), tone chips and an optional keyword → ten brandable gym names (Title Case, 4-24 characters, at most 4 words, no numbers, no existing gym brands), Copy / Copy All, availability caveat; Gemini with the original engine as fallback | name + email (the selections and names too once the form has the fields) |
 | Fitness Recipe Generator for Coaches & Gyms | `/recipe-generator/` | Same design → three distinct, goal-aligned recipes that honour every dietary restriction and the coach's notes (Gemini with a 40-recipe library as fallback), approximate nutrition, coach notes, a logo-branded PDF, disclaimer and a free-trial CTA | name + email (selections too once its form has the fields) |
 
 **Stack:** React 19 · TypeScript · Tailwind CSS v4 · Vite (multi-page) ·
@@ -86,7 +87,8 @@ allowed fields to HubSpot's Forms Submission API. Defaults: FitBudd's portal
 `ca6c259d-e274-49fd-8cf0-b5515be51a34`, Recipe Generator
 `b2222d23-1400-4bec-a812-e818740c59f5`, Instagram Bio Generator
 `784af8e3-2341-4478-9ec4-8452914687db`, Instagram Username Generator
-`8ec4d71b-21b7-4639-9849-e47ae5bea96d`. The IDs are public (they appear in
+`8ec4d71b-21b7-4639-9849-e47ae5bea96d`, Gym Name Generator
+`5c18559b-00e9-4c90-8d3e-9769a93e4e47`. The IDs are public (they appear in
 the forms' embed snippets). Nothing HubSpot-related ships in the bundle.
 
 ```
@@ -97,6 +99,7 @@ HUBSPOT_FORM_ID_FITNESS_CHALLENGE_GENERATOR   optional, per-tool form
 HUBSPOT_FORM_ID_RECIPE_GENERATOR              optional, per-tool form
 HUBSPOT_FORM_ID_IG_BIO_GENERATOR              optional, per-tool form
 HUBSPOT_FORM_ID_IG_USERNAME_GENERATOR         optional, per-tool form
+HUBSPOT_FORM_ID_GYM_NAME_GENERATOR            optional, per-tool form
 HUBSPOT_PRIVATE_APP_TOKEN                     optional, authenticated secure-submit endpoint
 VITE_TRACK_IN_DEV                             dev only, 'true' sends events from `npm run dev`
 ```
@@ -124,6 +127,11 @@ What each tool sends:
   `generated_usernames`, `source`, `tool_source`, `campaign`, `page_url`,
   `submitted_at`; then `cta_click`. Its form is
   `8ec4d71b-21b7-4639-9849-e47ae5bea96d`.
+- **Gym Name Generator**, `generation` (on Generate): `email`, `firstname`,
+  `gym_types`, `target_audiences`, `tone_styles`, `keyword`,
+  `generated_gym_names`, `source`, `tool_source`, `campaign`, `page_url`,
+  `submitted_at`; then `cta_click`. Its form is
+  `5c18559b-00e9-4c90-8d3e-9769a93e4e47`.
 - **Recipe Generator**, `lead` (on Generate Recipes): `email`, `firstname`,
   `client_goal`, `preferred_protein`, `dietary_preference`, `meal_type`,
   `cooking_time`, `notes`, `generated_recipes`, `tool_source`, `campaign`
@@ -357,6 +365,34 @@ full-screen expand button was dropped; the hub modal covers that need.
   dictionaries and ranking, made deterministic and seedable so Regenerate
   rotates the mix. Fallback only.
 
+## Gym Name Generator
+
+Migrated from the standalone Gym-Name-Gen repo (gym-name-gen.vercel.app).
+Same inputs in the hub shell: Gym Type/Focus and Target Audience
+(multi-select dropdowns, required), Tone/Style chips (optional here; the old
+tool required a tone without marking it), an optional Keyword, then Full
+Name and Email. Results open in the shared modal: ten names in a two-column
+list with Copy on each (long names wrap, they are never cut off), Copy All,
+an availability caveat, Regenerate, and the original CTA copy with the same
+self-sign-up link and UTM tags as the old tool (`utm_source=ai_tool`,
+`utm_campaign=gym_name_generator`).
+
+- Gemini-first (`aiGymNames.ts`): the prompt asks for 16 candidates that fit
+  the gym type, audience and tone, in varied formats (Forge Athletics, The
+  Iron Yard, GritHouse, House of Grit, Rivera Strength), using the keyword
+  in three or four. Every name is validated (Title Case, 4-24 characters, at
+  most 4 words, letters only, one possessive apostrophe or a trailing "Co."
+  allowed, no existing gym brands, no filler such as Ultimate or Xtreme),
+  tidied (casing, curly apostrophes), de-duplicated, kept away from the
+  previous set, and no single word carries more than three names. The best
+  ten are shown, topped up from the engine when needed.
+- `generateGymNames.ts`: the original deterministic engine, ported with its
+  word pools, scoring and repetition control (pool of 20, top 10 shown).
+  Fallback and top-up only; on Regenerate it serves the names not yet shown.
+- The old tool posted to HubSpot straight from the browser with `VITE_`
+  variables. The hub posts through `api/track.ts` like every other tool, so
+  those variables are no longer needed.
+
 ## Structure
 
 ```
@@ -366,6 +402,7 @@ fitness-challenge-generator/index.html
 recipe-generator/index.html
 ig-bio-generator/index.html
 ig-username-generator/index.html
+gym-name-generator/index.html
 api/
   track.ts                         shared HubSpot route: per-tool form + fields
   generate.ts                      shared Gemini route: hashtags, challenge, recipes
@@ -377,7 +414,8 @@ src/
     disclaimers.ts                 recipe + challenge disclaimers
     components/                    SelectDropdown, MultiSelectDropdown, MultiSelectChips
                                    (≤5 options only), ToolModal, PdfDownloadButton,
-                                   CTASection, HashMark, ToolMark, InstagramMark
+                                   CTASection, HashMark, ToolMark, InstagramMark,
+                                   DumbbellMark
     lib/tracking.ts                postEvent, email validation (format + disposable
                                    domains blocked), trial URL
     lib/copy.ts                    clipboard helper with iframe fallback
@@ -392,6 +430,8 @@ src/
                                    aiBios, generateBios (fallback), tracking, types
   tools/ig-username-generator/     IgUsernameGenerator (form), UsernameResultsModal,
                                    aiUsernames, generateUsernames (fallback), tracking, types
+  tools/gym-name-generator/        GymNameGenerator (form), GymNameResultsModal,
+                                   aiGymNames, generateGymNames (fallback), tracking, types
   tools/recipe-generator/          RecipeGenerator (form), RecipeModal, RecipeCard,
                                    aiRecipes, generateRecipes (library), nutrition
                                    (estimator + protein rules), calorieTarget,
