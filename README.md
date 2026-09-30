@@ -368,7 +368,8 @@ full-screen expand button was dropped; the hub modal covers that need.
 ## Gym Name Generator
 
 Migrated from the standalone Gym-Name-Gen repo (gym-name-gen.vercel.app).
-Same inputs in the hub shell: Gym Type/Focus and Target Audience
+Same inputs in the hub shell: Gym Type/Focus (the original twelve plus
+HYROX Training Gym and Calisthenics Training Gym) and Target Audience
 (multi-select dropdowns, required), Tone/Style chips (optional here; the old
 tool required a tone without marking it), an optional Keyword, then Full
 Name and Email. Results open in the shared modal: ten names in a two-column
@@ -382,7 +383,8 @@ self-sign-up link and UTM tags as the old tool (`utm_source=ai_tool`,
   Iron Yard, GritHouse, House of Grit, Rivera Strength), using the keyword
   in three or four. Every name is validated (Title Case, 4-24 characters, at
   most 4 words, letters only, one possessive apostrophe or a trailing "Co."
-  allowed, no existing gym brands, no filler such as Ultimate or Xtreme),
+  allowed, no existing gym brands, no filler such as Ultimate or Xtreme,
+  and never the HYROX mark itself, which is a registered race brand),
   tidied (casing, curly apostrophes), de-duplicated, kept away from the
   previous set, and no single word carries more than three names. The best
   ten are shown, topped up from the engine when needed.

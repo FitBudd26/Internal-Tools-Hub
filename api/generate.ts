@@ -541,7 +541,7 @@ const igusername: ToolSpec = {
 const gymname: ToolSpec = {
   maxOutputTokens: 1024,
   parse(o) {
-    const gymTypes = strings(o.gymTypes, 12, 40);
+    const gymTypes = strings(o.gymTypes, 14, 40);
     const audiences = strings(o.audiences, 10, 40);
     if (!gymTypes.length || !audiences.length) return null;
     return {
@@ -569,7 +569,7 @@ const gymname: ToolSpec = {
       'Return exactly 16 candidate business names (the best 10 are kept):',
       '- Title Case, 4-24 characters, at most 4 words, letters and spaces only. No numbers, hyphens, ampersands or symbols. One possessive apostrophe is fine, and a name may end in "Co.".',
       '- Original and brandable: easy to say, spell and put on a sign. Every name must fit the gym type and speak to the audience.',
-      '- Never use or imitate an existing gym brand (Gold\'s Gym, Planet Fitness, Anytime Fitness, Equinox, Crunch, Orangetheory, Barry\'s, F45, Snap Fitness, SoulCycle, Curves, YMCA, World Gym, LA Fitness, Life Time, PureGym, Virgin Active, Fitness First, Blink) and never use FitBudd.',
+      '- Never use or imitate an existing gym brand (Gold\'s Gym, Planet Fitness, Anytime Fitness, Equinox, Crunch, Orangetheory, Barry\'s, F45, Snap Fitness, SoulCycle, Curves, YMCA, World Gym, LA Fitness, Life Time, PureGym, Virgin Active, Fitness First, Blink) and never use FitBudd. HYROX is a registered race brand: for a HYROX gym, name it after the sport (running, sleds, hybrid racing) and never put "Hyrox" in a name.',
       '- No filler words: Best, Ultimate, Xtreme, Extreme, Number One.',
       '- Vary the formats across the set: noun + descriptor (Forge Athletics), "The ... Yard/Room/Den" (The Iron Yard), one-word compounds (GritHouse), "House of ..." (House of Grit), evocative two-word names (Summit Strength), and at most two names built on the owner\'s last name (Rivera Strength, The Rivera Method).',
       '- Keep the set varied: no single word in more than two names, no mirror pairs (Iron Summit and Summit Iron), no two names that differ only by the last word.',

@@ -45,6 +45,7 @@ const BANNED_NORMALIZED = [
   'ymca',
   'worldgym',
   'lafitness',
+  'hyrox',
   'lifetimefitness',
   'puregym',
   'virginactive',
@@ -104,6 +105,11 @@ const TYPE_DATA: Record<GymType, TypeData> = {
     nouns: ['Forge', 'Engine', 'Grit', 'Surge'],
     anchors: ['CrossFit', 'Athletics'],
   },
+  // HYROX is a registered race brand, so names are built from the sport (running + sleds), never the mark.
+  'HYROX Training Gym': {
+    nouns: ['Pace', 'Sled', 'Hybrid', 'Engine'],
+    anchors: ['Racing', 'Endurance', 'Athletics'],
+  },
   'Boutique Fitness Studio': {
     nouns: ['Pulse', 'Tempo', 'Sculpt', 'Glow'],
     anchors: ['Studio', 'Collective', 'Club'],
@@ -127,6 +133,10 @@ const TYPE_DATA: Record<GymType, TypeData> = {
   'Functional Training': {
     nouns: ['Primal', 'Motion', 'Engine', 'Forge'],
     anchors: ['Training', 'Performance', 'Athletics'],
+  },
+  'Calisthenics Training Gym': {
+    nouns: ['Gravity', 'Lever', 'Rings', 'Bars'],
+    anchors: ['Calisthenics', 'Movement', 'Athletics'],
   },
   'Personal Training Studio': {
     nouns: ['Method', 'Precision', 'Progress', 'Momentum'],
