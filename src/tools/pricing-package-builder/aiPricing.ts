@@ -110,7 +110,8 @@ export function cleanStrategy(raw: unknown, input: PricingInput, local: PricingS
   const rawNotes = Array.isArray(o.strategyNotes) ? o.strategyNotes : [];
   const strategyNotes = local.strategyNotes.map((builtIn, i) => {
     const note = tidy(rawNotes[i], 900);
-    const ok = note.length >= 60 && noteIsHonest(note, local.pricing, local.figures);
+    // A real note: at least two sentences, and only the tool's own figures.
+    const ok = note.length >= 120 && (note.match(/[.!?](\s|$)/g) ?? []).length >= 2 && noteIsHonest(note, local.pricing, local.figures);
     if (ok) fromModel++;
     return ok ? note : builtIn;
   });
