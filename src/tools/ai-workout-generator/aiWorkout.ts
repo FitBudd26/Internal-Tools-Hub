@@ -15,7 +15,8 @@ import type { Exercise, GuidedInput, RoutineItem, WorkoutPlan, WorkoutRequest } 
 export type GenerationSource = 'ai' | 'local';
 export interface WorkoutGeneration { plan: WorkoutPlan; source: GenerationSource }
 
-const REQUEST_TIMEOUT_MS = 28_000;
+/** Just above the route's own 26s upstream limit, so the route answers first. */
+const REQUEST_TIMEOUT_MS = 29_000;
 const MIN_EXERCISES = 3;
 const MAX_EXERCISES = 10;
 const FAT_LOSS_NOTE = 'Fat loss is driven mainly by a calorie deficit from nutrition and daily steps; this session supports it.';
@@ -94,6 +95,9 @@ function exercises(v: unknown): Exercise[] {
     out.push({ exercise, sets, reps, rest, ...(tempo ? { tempo } : {}), notes, ...(modification && !/^(n\/?a|none|-)$/i.test(modification) ? { modification } : {}) });
     if (out.length >= MAX_EXERCISES) break;
   }
+  // In a circuit the rest between rounds belongs to the format, not to the last station.
+  const rounds = out.length >= 3 && out.every((e) => /rounds?$/i.test(e.sets));
+  if (rounds && new Set(out.slice(0, -1).map((e) => e.rest)).size === 1) out[out.length - 1].rest = out[0].rest;
   // One circuit needs no label: drop a word prefix that every row shares ("Circuit: ...").
   const shared = /^([A-Za-z][A-Za-z ]{1,14}):\s+/.exec(out[0]?.exercise ?? '')?.[0];
   if (shared && out.length > 1 && out.every((e) => e.exercise.startsWith(shared) && e.exercise.length > shared.length)) {
@@ -125,8 +129,8 @@ export function straightSetMinutes(rows: Exercise[]): number | null {
 
 /**
  * The model tends to over-program. When straight sets clearly overshoot the
- * main-work budget, a fourth set goes first, then the last exercises, never
- * below four.
+ * main-work budget, a fourth set goes first, then the last exercises (never
+ * below four), and in a short session a third set from the end backwards.
  */
 export function fitToBudget(rows: Exercise[], budgetMin: number): Exercise[] {
   const over = (list: Exercise[]) => {
@@ -136,8 +140,19 @@ export function fitToBudget(rows: Exercise[], budgetMin: number): Exercise[] {
   if (!over(rows)) return rows;
   let out = rows.map((r) => (/^[4-9](\s*sets?)?$/i.test(r.sets.trim()) ? { ...r, sets: r.sets.trim().replace(/^\d/, '3') } : r));
   while (over(out) && out.length > 4) out = out.slice(0, -1);
+  for (let i = out.length - 1; i >= 0 && over(out); i--) {
+    if (/^3(\s*sets?)?$/i.test(out[i].sets.trim())) out[i] = { ...out[i], sets: out[i].sets.trim().replace(/^3/, '2') };
+  }
   return out;
 }
+
+/** Sentences about how the plan was produced ("no client name was provided") are not coaching notes. */
+const META_NOTE = /client name|no name|from the prompt|from the description|as instructed|the instructions|default profile|was (explicitly )?(set|provided|given|specified)|were (not )?(provided|given|specified)/i;
+export const coachingOnly = (notes: string): string =>
+  (notes.match(/[^.!?]+[.!?]*/g) ?? [notes])
+    .map((sentence) => sentence.trim())
+    .filter((sentence) => sentence && !META_NOTE.test(sentence))
+    .join(' ');
 
 /** The model's plan made safe to show, or null when it is not usable. */
 export function cleanPlan(raw: unknown, request: WorkoutRequest, base: GuidedInput, local: WorkoutPlan): WorkoutPlan | null {
@@ -179,7 +194,7 @@ export function cleanPlan(raw: unknown, request: WorkoutRequest, base: GuidedInp
 
   const aiName = tidy(o.clientName, 80);
   const goal = guided ? base.goal : tidy(o.goal, 60) || base.goal;
-  let trainerNotes = tidy(o.trainerNotes, 700) || local.trainerNotes;
+  let trainerNotes = coachingOnly(tidy(o.trainerNotes, 700)) || local.trainerNotes;
   if (/fat loss|weight loss/i.test(goal) && !/deficit|nutrition/i.test(trainerNotes)) trainerNotes = `${trainerNotes} ${FAT_LOSS_NOTE}`.trim();
 
   return {
