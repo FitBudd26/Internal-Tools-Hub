@@ -354,6 +354,8 @@ function pickMoves(patterns: Pattern[], count: number, ctx: Context): Move[] {
 
 const WARM_MIN = (d: number) => (d <= 20 ? 4 : d <= 45 ? 6 : 8);
 const COOL_MIN = (d: number) => (d <= 20 ? 2 : d <= 30 ? 3 : 5);
+/** Minutes left for the main work once the warm-up and the cool-down are taken out. */
+export const mainBudgetMinutes = (d: number): number => d - WARM_MIN(d) - COOL_MIN(d);
 
 /* --------------------------- straight sets --------------------------- */
 
@@ -609,7 +611,7 @@ export function generateWorkout(input: GuidedInput, variant = 0): WorkoutPlan {
     avoid,
     rng: mulberry32(seed),
     gentle: input.intensity === 'Low' || input.age >= 60 || input.age < 16,
-    budgetMin: input.durationMin - WARM_MIN(input.durationMin) - COOL_MIN(input.durationMin),
+    budgetMin: mainBudgetMinutes(input.durationMin),
   };
   const flow = FLOW_TYPES.includes(input.workoutType);
   const timed = TIMED_TYPES.includes(input.workoutType);

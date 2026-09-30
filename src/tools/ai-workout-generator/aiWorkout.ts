@@ -1,13 +1,15 @@
-import { exerciseKey, generateWorkout, parseChatPrompt } from './generateWorkout';
+import { exerciseKey, generateWorkout, limitationsFrom, mainBudgetMinutes, parseChatPrompt } from './generateWorkout';
 import type { Exercise, GuidedInput, RoutineItem, WorkoutPlan, WorkoutRequest } from './types';
 
 /**
  * Gemini-first workout plans with a guaranteed answer. The shared route asks
  * Gemini for the session in a fixed schema; the answer is checked here
  * (complete rows, no header rows, no repeated movements, no warm-up drill
- * reused as a working exercise, no dashes, the client's own name and goal)
- * and anything that fails falls back to the built-in engine, in whole or,
- * for a missing warm-up or cool-down, in part.
+ * reused as a working exercise, no jumping or contraindicated stretches
+ * for a client who cannot do them, a session that fits the clock, tidy
+ * tempo and names, no dashes, the client's own name and goal) and anything
+ * that fails falls back to the built-in engine, in whole or, for a thin
+ * warm-up or cool-down, in part.
  */
 
 export type GenerationSource = 'ai' | 'local';
@@ -22,8 +24,35 @@ const FAT_LOSS_NOTE = 'Fat loss is driven mainly by a calorie deficit from nutri
 const tidy = (v: unknown, max: number): string =>
   typeof v === 'string' ? v.replace(/[–—]/g, '-').replace(/\s+/g, ' ').trim().slice(0, max).trim() : '';
 
-/** "C1: Push-Up" and "A2 - Row" compare as "Push-Up" and "Row". */
-const baseKey = (name: string): string => exerciseKey(name.replace(/^[A-Za-z]{1,2}\d{0,2}\s*[:\-.)]\s+/, ''));
+/** "C1: Push-Up", "A2 - Row" and "Minute 3: Row" compare as "Push-Up" and "Row". */
+const baseKey = (name: string): string => exerciseKey(name.replace(/^[A-Za-z]+\s?\d{0,2}\s*:\s+/, '').replace(/^[A-Za-z]{1,2}\d{1,2}\s*[-.)]\s+/, ''));
+
+const SMALL_WORDS = new Set(['a', 'an', 'and', 'at', 'for', 'from', 'in', 'into', 'of', 'on', 'or', 'over', 'per', 'the', 'to', 'under', 'with']);
+/** "seated dumbbell press" reads "Seated Dumbbell Press"; words already capitalised (RDL, EMOM) are left alone. */
+export const titleCase = (name: string): string =>
+  name
+    .split(' ')
+    .map((word, i) =>
+      word
+        .split('-')
+        .map((part, j) => ((i > 0 || j > 0) && SMALL_WORDS.has(part) ? part : part.replace(/^[a-z]/, (c) => c.toUpperCase())))
+        .join('-'),
+    )
+    .join(' ');
+
+/** Lifting tempo as digits ("3-1-1"); nothing for timed work or for words such as "Fast". */
+function tempoOf(raw: unknown, reps: string): string {
+  const t = tidy(raw, 24).replace(/\s/g, '');
+  if (/\d\s*s\b|sec|work|hold|min/i.test(reps)) return '';
+  if (/^\d{3,4}$/.test(t)) return t.split('').join('-');
+  return /^\d(-\d){2,3}$/.test(t) ? t : '';
+}
+
+/** High-impact work, for clients who cannot jump. */
+const IMPACT = /jump|burpee|plyo|\bhops?\b|high knees|plank jack/i;
+/** Stretches and positions that load a listed knee or lower back. */
+const KNEE_LOADING = /child'?s? pose|hero pose|deep squat|couch stretch|pigeon|standing quad|kneeling quad/i;
+const BACK_LOADING = /forward fold|toe[- ]touch|sit and reach|seated hamstring|standing hamstring/i;
 const HEADER_ROW = /^(circuit|block|round|superset|part|section|set|warm[- ]?up|cool[- ]?down|finisher)\s*[a-z0-9]{0,2}\s*:?$/i;
 const NO_NAME = /^(client|the client|n\/?a|none|unknown|not given|anonymous)$/i;
 
@@ -33,7 +62,7 @@ function routine(v: unknown): RoutineItem[] {
   const seen = new Set<string>();
   for (const x of v) {
     const o = (x ?? {}) as Record<string, unknown>;
-    const movement = tidy(o.movement, 80);
+    const movement = titleCase(tidy(o.movement, 80));
     const duration = tidy(o.duration, 40);
     const notes = tidy(o.notes, 200);
     const key = exerciseKey(movement);
@@ -51,7 +80,7 @@ function exercises(v: unknown): Exercise[] {
   const seen = new Set<string>();
   for (const x of v) {
     const o = (x ?? {}) as Record<string, unknown>;
-    const exercise = tidy(o.exercise, 100).replace(/^\d+[.)]\s+/, '');
+    const exercise = titleCase(tidy(o.exercise, 100).replace(/^\d+[.)]\s+/, ''));
     const sets = tidy(o.sets, 30);
     const reps = tidy(o.reps, 40);
     const rest = tidy(o.rest, 40);
@@ -59,12 +88,54 @@ function exercises(v: unknown): Exercise[] {
     // Header rows ("Circuit 1") and half-filled rows would render as broken numbered items.
     if (!exercise || !sets || !reps || !rest || !key || HEADER_ROW.test(exercise) || seen.has(key)) continue;
     seen.add(key);
-    const tempo = tidy(o.tempo, 20);
+    const tempo = tempoOf(o.tempo, reps);
     const notes = tidy(o.notes, 260);
     const modification = tidy(o.modification, 220);
-    out.push({ exercise, sets, reps, rest, ...(tempo && !/^(n\/?a|none|-)$/i.test(tempo) ? { tempo } : {}), notes, ...(modification && !/^(n\/?a|none|-)$/i.test(modification) ? { modification } : {}) });
+    out.push({ exercise, sets, reps, rest, ...(tempo ? { tempo } : {}), notes, ...(modification && !/^(n\/?a|none|-)$/i.test(modification) ? { modification } : {}) });
     if (out.length >= MAX_EXERCISES) break;
   }
+  // One circuit needs no label: drop a word prefix that every row shares ("Circuit: ...").
+  const shared = /^([A-Za-z][A-Za-z ]{1,14}):\s+/.exec(out[0]?.exercise ?? '')?.[0];
+  if (shared && out.length > 1 && out.every((e) => e.exercise.startsWith(shared) && e.exercise.length > shared.length)) {
+    for (const e of out) e.exercise = titleCase(e.exercise.slice(shared.length));
+  }
+  return out;
+}
+
+const seconds = (text: string, fallback: number): number => {
+  const nums = (text.match(/\d+(\.\d+)?/g) ?? []).map(Number);
+  if (!nums.length) return fallback;
+  const value = nums.length > 1 ? (nums[0] + nums[1]) / 2 : nums[0];
+  return /min/i.test(text) ? value * 60 : value;
+};
+
+/** Minutes of main work for straight sets, or null when the rows are rounds, intervals or otherwise not countable. */
+export function straightSetMinutes(rows: Exercise[]): number | null {
+  let total = 0;
+  for (const r of rows) {
+    const sets = /^(\d+)(\s*sets?)?$/i.exec(r.sets.trim());
+    if (!sets) return null;
+    const timed = /\d\s*s\b|sec|min/i.test(r.reps);
+    const top = Math.max(...(r.reps.match(/\d+/g) ?? ['10']).map(Number));
+    const work = timed ? seconds(r.reps, 40) : top <= 6 ? 30 : 40;
+    total += (Number(sets[1]) * (work + seconds(r.rest, 60))) / 60;
+  }
+  return total * 1.1;
+}
+
+/**
+ * The model tends to over-program. When straight sets clearly overshoot the
+ * main-work budget, a fourth set goes first, then the last exercises, never
+ * below four.
+ */
+export function fitToBudget(rows: Exercise[], budgetMin: number): Exercise[] {
+  const over = (list: Exercise[]) => {
+    const minutes = straightSetMinutes(list);
+    return minutes !== null && minutes > budgetMin * 1.1;
+  };
+  if (!over(rows)) return rows;
+  let out = rows.map((r) => (/^[4-9](\s*sets?)?$/i.test(r.sets.trim()) ? { ...r, sets: r.sets.trim().replace(/^\d/, '3') } : r));
+  while (over(out) && out.length > 4) out = out.slice(0, -1);
   return out;
 }
 
@@ -72,18 +143,40 @@ function exercises(v: unknown): Exercise[] {
 export function cleanPlan(raw: unknown, request: WorkoutRequest, base: GuidedInput, local: WorkoutPlan): WorkoutPlan | null {
   if (!raw || typeof raw !== 'object') return null;
   const o = raw as Record<string, unknown>;
-  const mainWorkout = exercises(o.mainWorkout);
+  const guided = request.mode === 'guided';
+  const avoid = limitationsFrom(base.notes, base.age, base.intensity);
+  const minutes = guided ? base.durationMin : Number(/\d+/.exec(tidy(o.duration, 40))?.[0] ?? base.durationMin);
+
+  // No jumping for a client who cannot jump, then make the session fit the clock.
+  let mainWorkout = exercises(o.mainWorkout);
+  if (avoid.has('jump')) mainWorkout = mainWorkout.filter((e) => !IMPACT.test(e.exercise));
   if (mainWorkout.length < MIN_EXERCISES) return null;
+  mainWorkout = fitToBudget(mainWorkout, mainBudgetMinutes(minutes >= 10 && minutes <= 120 ? minutes : base.durationMin));
 
   const working = new Set(mainWorkout.map((e) => baseKey(e.exercise)));
-  const notReused = (items: RoutineItem[]) => items.filter((i) => !working.has(exerciseKey(i.movement)));
-  let warmup = notReused(routine(o.warmup));
-  let cooldown = notReused(routine(o.cooldown));
-  if (warmup.length < 2) warmup = notReused(local.warmup);
-  if (cooldown.length < 2) cooldown = notReused(local.cooldown);
+  const suitable = (items: RoutineItem[]) =>
+    items.filter(
+      (i) =>
+        !working.has(exerciseKey(i.movement)) &&
+        !(avoid.has('jump') && IMPACT.test(i.movement)) &&
+        !(avoid.has('knee') && KNEE_LOADING.test(i.movement)) &&
+        !(avoid.has('back') && BACK_LOADING.test(i.movement)),
+    );
+  // A thin warm-up or cool-down is topped up from the engine, which already respects the limitations.
+  const topUp = (items: RoutineItem[], spare: RoutineItem[]) => {
+    const out = [...items];
+    for (const extra of suitable(spare)) {
+      if (out.length >= 4) break;
+      if (!out.some((i) => exerciseKey(i.movement) === exerciseKey(extra.movement))) out.push(extra);
+    }
+    return out;
+  };
+  let warmup = suitable(routine(o.warmup));
+  let cooldown = suitable(routine(o.cooldown));
+  if (warmup.length < 2) warmup = topUp(warmup, local.warmup);
+  if (cooldown.length < 2) cooldown = topUp(cooldown, local.cooldown);
   if (warmup.length < 2 || cooldown.length < 2) return null;
 
-  const guided = request.mode === 'guided';
   const aiName = tidy(o.clientName, 80);
   const goal = guided ? base.goal : tidy(o.goal, 60) || base.goal;
   let trainerNotes = tidy(o.trainerNotes, 700) || local.trainerNotes;
