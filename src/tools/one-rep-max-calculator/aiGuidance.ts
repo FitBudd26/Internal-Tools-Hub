@@ -51,7 +51,8 @@ function cleanWarmup(raw: unknown, firstWorkingPercent: number): WarmupStep[] | 
     if (prev && (percent <= prev.percent || reps > prev.reps)) return null;
     steps.push({ percent, reps });
   }
-  return steps[steps.length - 1].percent <= Math.max(firstWorkingPercent, 70) + 10 ? steps : null;
+  // A warm-up leads up to the work: it may touch the first working load, not pass it by more than a step.
+  return steps[steps.length - 1].percent <= firstWorkingPercent + 5 ? steps : null;
 }
 
 function cleanPlan(raw: unknown, result: OneRmResult): PlanWeek[] | null {
