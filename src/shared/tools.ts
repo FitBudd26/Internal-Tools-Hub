@@ -45,6 +45,14 @@ export const TOOLS: ToolMeta[] = [
     fallbackHeight: 580,
   },
   {
+    slug: 'ai-workout-generator',
+    name: 'AI Workout Generator',
+    description:
+      'Client-ready single-session workout plans from a guided form or a plain-language description (Gemini with a built-in engine as fallback), shown in full with a branded PDF. Captures email + profession. Migrated from ai-workout-builder-ten.vercel.app.',
+    // Taller than the other tools: client fields, the coach's details and consent on one screen.
+    fallbackHeight: 760,
+  },
+  {
     slug: 'recipe-generator',
     name: 'Fitness Recipe Generator for Coaches & Gyms',
     description:

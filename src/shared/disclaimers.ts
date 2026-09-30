@@ -4,3 +4,6 @@ export const RECIPE_DISCLAIMER =
 
 export const CHALLENGE_DISCLAIMER =
   'This framework is general coaching guidance, not medical advice. Adapt it to each participant\'s health status and training history, and refer out to a qualified professional where appropriate.';
+
+export const WORKOUT_DISCLAIMER =
+  'This plan is general fitness guidance, not medical advice, and it does not diagnose or treat any injury or condition. Coaches should review and adapt it to each client\'s health status, training history and limitations before use. Stop the session and consult a qualified professional if there is pain, dizziness or any unusual symptom.';

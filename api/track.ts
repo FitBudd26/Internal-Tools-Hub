@@ -41,6 +41,8 @@ interface ToolConfig {
   formIdEnv: string;
   /** This tool's HubSpot form (FitBudd portal); env vars override it. */
   defaultFormId: string;
+  /** When the tool collects consent with a tick box, the wording sent as the form's consent to process. */
+  consentText?: string;
   events: Record<string, EventSpec>;
 }
 
@@ -143,6 +145,26 @@ const TOOLS: Record<string, ToolConfig> = {
       generation: {
         primary: true,
         fields: ['email', 'firstname', 'gym_types', 'target_audiences', 'tone_styles', 'keyword', 'generated_gym_names', 'source', 'tool_source', 'campaign', 'page_url', 'submitted_at'],
+      },
+      cta_click: {
+        primary: false,
+        fields: ['email', 'cta_clicked', 'cta_text', 'cta_url', 'cta_clicked_at', 'tool_source', 'page_url'],
+      },
+    },
+  },
+  'ai-workout-generator': {
+    pageName: 'AI Workout Generator',
+    formIdEnv: 'HUBSPOT_FORM_ID_AI_WORKOUT_GENERATOR',
+    defaultFormId: 'c50c2e53-ff2e-4d8c-82cd-fd0be0521aa8',
+    consentText: 'I agree to allow FitBudd to store and process my personal data.',
+    events: {
+      lead: {
+        primary: true,
+        fields: ['email', 'are_you_a_fitness_professional', 'workout_mode', 'workout_goal', 'workout_location', 'workout_intensity', 'workout_type', 'workout_duration', 'target_area', 'tool_source', 'campaign', 'page_url', 'submitted_at'],
+      },
+      pdf_download: {
+        primary: false,
+        fields: ['email', 'pdf_downloaded', 'pdf_downloaded_at', 'tool_source', 'page_url'],
       },
       cta_click: {
         primary: false,
@@ -360,6 +382,7 @@ export default async function handler(
               pageUri: typeof fields.page_url === 'string' ? fields.page_url : '',
               pageName: cfg.pageName,
             },
+            ...(cfg.consentText ? { legalConsentOptions: { consent: { consentToProcess: true, text: cfg.consentText } } } : {}),
           }),
         });
         if (!upstream.ok) {

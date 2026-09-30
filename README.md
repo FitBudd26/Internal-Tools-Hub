@@ -13,6 +13,7 @@ tool with its embed snippet.
 | Instagram Bio Generator | `/ig-bio-generator/` | Migrated from ig-bio-gen.vercel.app into the shared shell: business type, audience, specializations, tone, experience, location and USP → four bios in four angles (authority, results, community, value) within Instagram's 150 characters; Gemini with the original templated engine as fallback | name + email (the original custom fields too once the form has them) |
 | Instagram Username Generator | `/ig-username-generator/` | Migrated from ig-username-gen.vercel.app: niche(s), trainer type(s), tone chips and an optional keyword → ten short, brandable handles (lowercase letters, one separator at most, 3-18 characters, no numbers), Copy / Copy All, availability caveat; Gemini with the original engine as fallback | name + email (the original custom fields too once the form has them) |
 | Gym Name Generator | `/gym-name-generator/` | Migrated from gym-name-gen.vercel.app: gym type(s), target audience(s), tone chips and an optional keyword → ten brandable gym names (Title Case, 4-24 characters, at most 4 words, no numbers, no existing gym brands), Copy / Copy All, availability caveat; Gemini with the original engine as fallback | name + email (the selections and names too once the form has the fields) |
+| AI Workout Generator | `/ai-workout-generator/` | Migrated from ai-workout-builder-ten.vercel.app: Guided Mode (client, age, goal, location, intensity, type, duration, target area, notes) or Chat Mode (plain-language description) → a complete single-session plan (warm-up, exercises with sets, reps, rest, cues and modifications, cool-down, progression, weekly split, trainer notes) shown in full, with a branded PDF; Gemini with a built-in workout engine as fallback | email + "Are you a fitness professional?" (the session settings too once the form has the fields) |
 | Fitness Recipe Generator for Coaches & Gyms | `/recipe-generator/` | Same design → three distinct, goal-aligned recipes that honour every dietary restriction and the coach's notes (Gemini with a 40-recipe library as fallback), approximate nutrition, coach notes, a logo-branded PDF, disclaimer and a free-trial CTA | name + email (selections too once its form has the fields) |
 
 **Stack:** React 19 · TypeScript · Tailwind CSS v4 · Vite (multi-page) ·
@@ -88,7 +89,8 @@ allowed fields to HubSpot's Forms Submission API. Defaults: FitBudd's portal
 `b2222d23-1400-4bec-a812-e818740c59f5`, Instagram Bio Generator
 `784af8e3-2341-4478-9ec4-8452914687db`, Instagram Username Generator
 `8ec4d71b-21b7-4639-9849-e47ae5bea96d`, Gym Name Generator
-`5c18559b-00e9-4c90-8d3e-9769a93e4e47`. The IDs are public (they appear in
+`5c18559b-00e9-4c90-8d3e-9769a93e4e47`, AI Workout Generator
+`c50c2e53-ff2e-4d8c-82cd-fd0be0521aa8`. The IDs are public (they appear in
 the forms' embed snippets). Nothing HubSpot-related ships in the bundle.
 
 ```
@@ -100,6 +102,7 @@ HUBSPOT_FORM_ID_RECIPE_GENERATOR              optional, per-tool form
 HUBSPOT_FORM_ID_IG_BIO_GENERATOR              optional, per-tool form
 HUBSPOT_FORM_ID_IG_USERNAME_GENERATOR         optional, per-tool form
 HUBSPOT_FORM_ID_GYM_NAME_GENERATOR            optional, per-tool form
+HUBSPOT_FORM_ID_AI_WORKOUT_GENERATOR          optional, per-tool form
 HUBSPOT_PRIVATE_APP_TOKEN                     optional, authenticated secure-submit endpoint
 VITE_TRACK_IN_DEV                             dev only, 'true' sends events from `npm run dev`
 ```
@@ -132,6 +135,15 @@ What each tool sends:
   `generated_gym_names`, `source`, `tool_source`, `campaign`, `page_url`,
   `submitted_at`; then `cta_click`. Its form is
   `5c18559b-00e9-4c90-8d3e-9769a93e4e47`.
+- **AI Workout Generator**, `lead` (on Generate): `email`,
+  `are_you_a_fitness_professional` (the form's own dropdown, value for
+  value), `workout_mode`, `workout_goal`, `workout_location`,
+  `workout_intensity`, `workout_type`, `workout_duration`, `target_area`,
+  `tool_source`, `campaign`, `page_url`, `submitted_at`; then `pdf_download`
+  and `cta_click`. Its form is `c50c2e53-ff2e-4d8c-82cd-fd0be0521aa8`. This
+  tool has a consent tick box, so the submission also carries the form's
+  consent to process (`consentText` in the tool's config). The client's name
+  and the injury notes are never sent.
 - **Recipe Generator**, `lead` (on Generate Recipes): `email`, `firstname`,
   `client_goal`, `preferred_protein`, `dietary_preference`, `meal_type`,
   `cooking_time`, `notes`, `generated_recipes`, `tool_source`, `campaign`
@@ -395,6 +407,49 @@ self-sign-up link and UTM tags as the old tool (`utm_source=ai_tool`,
   variables. The hub posts through `api/track.ts` like every other tool, so
   those variables are no longer needed.
 
+## AI Workout Generator
+
+Migrated from the standalone AI-Workout-Builder repo (a Next.js app at
+ai-workout-builder-ten.vercel.app) onto the hub's shell and shared routes.
+
+- **Two input modes**, as before. Guided Mode: Client Name, Age, Goal,
+  Location, Intensity, Type, Duration, Target Area (all required) and
+  Injuries / Limitations / Notes, with a "Use sample" link. Chat Mode: a
+  plain-language description with three examples.
+- **Lead capture moved onto the form.** The old tool showed a preview and
+  asked for Email and "Are you a fitness professional?" in a second pop-up
+  before the PDF. In the hub both sit on the form with the consent tick box,
+  the results modal shows the whole plan, and the PDF downloads directly.
+  The old post-download sign-up pop-up is now the modal's CTA, with the
+  same self-sign-up link and UTM tags.
+- **Gemini-first** (`aiWorkout.ts` + the `workout` spec in
+  `api/generate.ts`). The prompt is the old tool's coaching brief: safety
+  and injury rules, format honesty (a circuit is prescribed as rounds),
+  push and pull balance, time budget, rest matched to rep range, no
+  movement reuse, fat-loss honesty, fully specified rows. The answer is
+  checked in the browser: header rows and half-filled rows are dropped,
+  repeated exercises and warm-up drills reused as working exercises are
+  removed, dashes become hyphens, guided mode keeps the form's own client
+  name, goal and duration, a placeholder name such as "Client" is blanked,
+  and the tool always prints its own disclaimer.
+- **Built-in engine** (`generateWorkout.ts`), new in the hub: the old tool
+  showed an error when the model failed. The engine builds a session from
+  an exercise library by the same rules: equipment by location, limitations
+  read from the notes (knee, back, shoulder, wrist, no jumping), straight
+  sets or a real circuit / HIIT / Tabata / EMOM / AMRAP / mobility flow,
+  sets by intensity and age, a time budget that fits the duration, and a
+  weekly split that names the complementary day. `parseChatPrompt` reads
+  goal, duration, age, location and limitations out of a Chat Mode
+  description for the same purpose. Regenerate sends the previous
+  exercises so the next session differs.
+- **PDF** (`generatePdf.ts`): logo header, title, summary card, format,
+  warm-up, exercise cards kept whole on a page, cool-down, progression,
+  weekly split, trainer notes, disclaimer and a linked call to action.
+- The iframe fallback height is 760 px here (the form is taller than the
+  other tools); iframe-resizer still sizes it exactly.
+- No longer needed from the old project: `GEMINI_API_KEY` there, the
+  Anthropic / OpenAI provider switches and the Resend email route.
+
 ## Structure
 
 ```
@@ -405,6 +460,7 @@ recipe-generator/index.html
 ig-bio-generator/index.html
 ig-username-generator/index.html
 gym-name-generator/index.html
+ai-workout-generator/index.html
 api/
   track.ts                         shared HubSpot route: per-tool form + fields
   generate.ts                      shared Gemini route: hashtags, challenge, recipes
@@ -413,7 +469,7 @@ src/
     index.css                      Tailwind theme (FitBudd colours) + iframe rules
     tools.ts                       tool registry + Webflow embed snippet
     logo.ts                        FitBudd logo as base64 PNG (for PDFs)
-    disclaimers.ts                 recipe + challenge disclaimers
+    disclaimers.ts                 recipe, challenge and workout disclaimers
     components/                    SelectDropdown, MultiSelectDropdown, MultiSelectChips
                                    (≤5 options only), ToolModal, PdfDownloadButton,
                                    CTASection, HashMark, ToolMark, InstagramMark,
@@ -434,6 +490,10 @@ src/
                                    aiUsernames, generateUsernames (fallback), tracking, types
   tools/gym-name-generator/        GymNameGenerator (form), GymNameResultsModal,
                                    aiGymNames, generateGymNames (fallback), tracking, types
+  tools/ai-workout-generator/      WorkoutGenerator (form, two modes), WorkoutModal,
+                                   WorkoutPlanView, aiWorkout, generateWorkout (fallback
+                                   engine + chat parser), generatePdf, format, links,
+                                   tracking, types
   tools/recipe-generator/          RecipeGenerator (form), RecipeModal, RecipeCard,
                                    aiRecipes, generateRecipes (library), nutrition
                                    (estimator + protein rules), calorieTarget,

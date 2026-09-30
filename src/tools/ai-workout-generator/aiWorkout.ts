@@ -1,0 +1,139 @@
+import { exerciseKey, generateWorkout, parseChatPrompt } from './generateWorkout';
+import type { Exercise, GuidedInput, RoutineItem, WorkoutPlan, WorkoutRequest } from './types';
+
+/**
+ * Gemini-first workout plans with a guaranteed answer. The shared route asks
+ * Gemini for the session in a fixed schema; the answer is checked here
+ * (complete rows, no header rows, no repeated movements, no warm-up drill
+ * reused as a working exercise, no dashes, the client's own name and goal)
+ * and anything that fails falls back to the built-in engine, in whole or,
+ * for a missing warm-up or cool-down, in part.
+ */
+
+export type GenerationSource = 'ai' | 'local';
+export interface WorkoutGeneration { plan: WorkoutPlan; source: GenerationSource }
+
+const REQUEST_TIMEOUT_MS = 28_000;
+const MIN_EXERCISES = 3;
+const MAX_EXERCISES = 10;
+const FAT_LOSS_NOTE = 'Fat loss is driven mainly by a calorie deficit from nutrition and daily steps; this session supports it.';
+
+/** Plain hyphens only, single spaces, no list numbering carried over from the model. */
+const tidy = (v: unknown, max: number): string =>
+  typeof v === 'string' ? v.replace(/[–—]/g, '-').replace(/\s+/g, ' ').trim().slice(0, max).trim() : '';
+
+/** "C1: Push-Up" and "A2 - Row" compare as "Push-Up" and "Row". */
+const baseKey = (name: string): string => exerciseKey(name.replace(/^[A-Za-z]{1,2}\d{0,2}\s*[:\-.)]\s+/, ''));
+const HEADER_ROW = /^(circuit|block|round|superset|part|section|set|warm[- ]?up|cool[- ]?down|finisher)\s*[a-z0-9]{0,2}\s*:?$/i;
+const NO_NAME = /^(client|the client|n\/?a|none|unknown|not given|anonymous)$/i;
+
+function routine(v: unknown): RoutineItem[] {
+  if (!Array.isArray(v)) return [];
+  const out: RoutineItem[] = [];
+  const seen = new Set<string>();
+  for (const x of v) {
+    const o = (x ?? {}) as Record<string, unknown>;
+    const movement = tidy(o.movement, 80);
+    const duration = tidy(o.duration, 40);
+    const notes = tidy(o.notes, 200);
+    const key = exerciseKey(movement);
+    if (!movement || !duration || seen.has(key)) continue;
+    seen.add(key);
+    out.push({ movement, duration, ...(notes ? { notes } : {}) });
+    if (out.length >= 6) break;
+  }
+  return out;
+}
+
+function exercises(v: unknown): Exercise[] {
+  if (!Array.isArray(v)) return [];
+  const out: Exercise[] = [];
+  const seen = new Set<string>();
+  for (const x of v) {
+    const o = (x ?? {}) as Record<string, unknown>;
+    const exercise = tidy(o.exercise, 100).replace(/^\d+[.)]\s+/, '');
+    const sets = tidy(o.sets, 30);
+    const reps = tidy(o.reps, 40);
+    const rest = tidy(o.rest, 40);
+    const key = baseKey(exercise);
+    // Header rows ("Circuit 1") and half-filled rows would render as broken numbered items.
+    if (!exercise || !sets || !reps || !rest || !key || HEADER_ROW.test(exercise) || seen.has(key)) continue;
+    seen.add(key);
+    const tempo = tidy(o.tempo, 20);
+    const notes = tidy(o.notes, 260);
+    const modification = tidy(o.modification, 220);
+    out.push({ exercise, sets, reps, rest, ...(tempo && !/^(n\/?a|none|-)$/i.test(tempo) ? { tempo } : {}), notes, ...(modification && !/^(n\/?a|none|-)$/i.test(modification) ? { modification } : {}) });
+    if (out.length >= MAX_EXERCISES) break;
+  }
+  return out;
+}
+
+/** The model's plan made safe to show, or null when it is not usable. */
+export function cleanPlan(raw: unknown, request: WorkoutRequest, base: GuidedInput, local: WorkoutPlan): WorkoutPlan | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const o = raw as Record<string, unknown>;
+  const mainWorkout = exercises(o.mainWorkout);
+  if (mainWorkout.length < MIN_EXERCISES) return null;
+
+  const working = new Set(mainWorkout.map((e) => baseKey(e.exercise)));
+  const notReused = (items: RoutineItem[]) => items.filter((i) => !working.has(exerciseKey(i.movement)));
+  let warmup = notReused(routine(o.warmup));
+  let cooldown = notReused(routine(o.cooldown));
+  if (warmup.length < 2) warmup = notReused(local.warmup);
+  if (cooldown.length < 2) cooldown = notReused(local.cooldown);
+  if (warmup.length < 2 || cooldown.length < 2) return null;
+
+  const guided = request.mode === 'guided';
+  const aiName = tidy(o.clientName, 80);
+  const goal = guided ? base.goal : tidy(o.goal, 60) || base.goal;
+  let trainerNotes = tidy(o.trainerNotes, 700) || local.trainerNotes;
+  if (/fat loss|weight loss/i.test(goal) && !/deficit|nutrition/i.test(trainerNotes)) trainerNotes = `${trainerNotes} ${FAT_LOSS_NOTE}`.trim();
+
+  return {
+    clientName: guided ? base.clientName : NO_NAME.test(aiName) ? '' : aiName,
+    goal,
+    duration: guided ? `${base.durationMin} minutes` : tidy(o.duration, 40) || `${base.durationMin} minutes`,
+    trainingFormat: tidy(o.trainingFormat, 360) || local.trainingFormat,
+    goalSummary: tidy(o.goalSummary, 460) || local.goalSummary,
+    warmup,
+    mainWorkout,
+    cooldown,
+    progression: tidy(o.progression, 460) || local.progression,
+    weeklySplitRecommendation: tidy(o.weeklySplitRecommendation, 460) || local.weeklySplitRecommendation,
+    trainerNotes,
+  };
+}
+
+export async function generateWorkoutWithAi(request: WorkoutRequest, variant = 0, avoid: string[] = []): Promise<WorkoutGeneration> {
+  const base = request.mode === 'guided' ? request.input : parseChatPrompt(request.prompt);
+  const local = generateWorkout(base, variant);
+  const raw = await fetchAi(request, variant, avoid);
+  const plan = raw ? cleanPlan(raw, request, base, local) : null;
+  return plan ? { plan, source: 'ai' } : { plan: local, source: 'local' };
+}
+
+async function fetchAi(request: WorkoutRequest, variant: number, avoid: string[]): Promise<unknown> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  try {
+    const res = await fetch('/api/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      signal: controller.signal,
+      body: JSON.stringify({
+        tool: 'workout',
+        ...(request.mode === 'guided' ? { mode: 'guided', ...request.input } : { mode: 'chat', prompt: request.prompt.trim().slice(0, 600) }),
+        variant,
+        avoid: avoid.slice(0, 12),
+      }),
+    });
+    const type = res.headers.get('content-type') ?? '';
+    if (!res.ok || !type.includes('application/json')) return null;
+    const data = (await res.json()) as { plan?: unknown };
+    return data.plan ?? null;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}

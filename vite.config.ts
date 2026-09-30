@@ -90,6 +90,7 @@ export default defineConfig({
         'ig-bio-generator': 'ig-bio-generator/index.html',
         'ig-username-generator': 'ig-username-generator/index.html',
         'gym-name-generator': 'gym-name-generator/index.html',
+        'ai-workout-generator': 'ai-workout-generator/index.html',
       },
     },
   },
