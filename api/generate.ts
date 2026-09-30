@@ -97,7 +97,7 @@ interface ToolSpec {
   temperature?: number;
   /** Upstream timeout for tools with long answers; the default suits the short ones. */
   timeoutMs?: number;
-  /** When set, a request that stalls this long (or fails with 429/5xx) is dropped and asked once more within timeoutMs. */
+  /** When set, a request that stalls this long (or fails with a 5xx) is dropped and asked once more within timeoutMs. */
   attemptTimeoutMs?: number;
   /** Optional thinkingConfig, to keep a long structured answer fast. Dropped automatically if the model rejects it. */
   thinking?: Record<string, unknown>;
@@ -889,7 +889,8 @@ export default async function handler(
           thinkingApplied = false;
           answer = await ask(undefined, timeLeft());
         }
-        if (!last && (answer.status === 429 || answer.status >= 500)) {
+        // A 5xx is worth one more go. A 429 is the rate limit: asking again at once only adds to it.
+        if (!last && answer.status >= 500) {
           console.error(`[${toolName}] gemini ${model} responded ${answer.status}, asking once more`);
           continue;
         }
