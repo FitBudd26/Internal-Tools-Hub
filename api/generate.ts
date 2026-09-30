@@ -82,7 +82,7 @@ function num(v: unknown, min: number, max: number): number | null {
 }
 
 function extractText(data: unknown): string {
-  const d = data as { candidates?: { content?: { parts?: { text?: string }[] } }[] };
+  const d = (data ?? {}) as { candidates?: { content?: { parts?: { text?: string }[] } }[] };
   return (d.candidates?.[0]?.content?.parts ?? []).map((p) => p.text ?? '').join('');
 }
 
@@ -847,12 +847,13 @@ export default async function handler(
   const deadline = Date.now() + (spec.timeoutMs ?? UPSTREAM_TIMEOUT_MS);
   try {
     const prompt = spec.prompt(input);
-    // One request to Gemini, given at most `ms` to answer.
-    const ask = async (thinking: Record<string, unknown> | undefined, ms: number): Promise<Response> => {
+    // One request to Gemini, given at most `ms` for the whole answer. The body is read under the
+    // same limit: headers can arrive at once while the answer itself stalls.
+    const ask = async (thinking: Record<string, unknown> | undefined, ms: number): Promise<{ status: number; ok: boolean; text: string }> => {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), ms);
       try {
-        return await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
+        const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
           signal: controller.signal,
@@ -868,6 +869,7 @@ export default async function handler(
             },
           }),
         });
+        return { status: r.status, ok: r.ok, text: await r.text() };
       } finally {
         clearTimeout(timer);
       }
@@ -875,7 +877,7 @@ export default async function handler(
     const timeLeft = () => Math.max(1000, deadline - Date.now());
     const tries = spec.attemptTimeoutMs ? 2 : 1;
     let thinkingApplied = Boolean(spec.thinking);
-    let upstream: Response | null = null;
+    let upstream: { status: number; ok: boolean; text: string } | null = null;
     for (let n = 1; n <= tries && !upstream; n++) {
       const last = n === tries;
       const budget = last ? timeLeft() : Math.min(timeLeft(), spec.attemptTimeoutMs ?? timeLeft());
@@ -883,7 +885,7 @@ export default async function handler(
         let answer = await ask(thinkingApplied ? spec.thinking : undefined, budget);
         if (answer.status === 400 && thinkingApplied) {
           // A model that does not know this thinking setting rejects the request: ask again without it.
-          console.error(`[${toolName}] gemini ${model} rejected thinkingConfig:`, (await answer.text()).slice(0, 300));
+          console.error(`[${toolName}] gemini ${model} rejected thinkingConfig:`, answer.text.slice(0, 300));
           thinkingApplied = false;
           answer = await ask(undefined, timeLeft());
         }
@@ -901,12 +903,12 @@ export default async function handler(
     if (!upstream) throw new Error('no answer');
 
     if (!upstream.ok) {
-      console.error(`[${toolName}] gemini ${model} responded ${upstream.status}:`, (await upstream.text()).slice(0, 300));
+      console.error(`[${toolName}] gemini ${model} responded ${upstream.status}:`, upstream.text.slice(0, 300));
       res.status(502).json({ error: 'upstream', status: upstream.status });
       return;
     }
 
-    const payload = spec.normalize(safeJson(extractText(await upstream.json())));
+    const payload = spec.normalize(safeJson(extractText(safeJson(upstream.text))));
     if (!payload) {
       console.error(`[${toolName}] gemini ${model} returned no usable answer`);
       res.status(502).json({ error: 'empty' });
