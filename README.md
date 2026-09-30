@@ -426,12 +426,28 @@ ai-workout-builder-ten.vercel.app) onto the hub's shell and shared routes.
   `api/generate.ts`). The prompt is the old tool's coaching brief: safety
   and injury rules, format honesty (a circuit is prescribed as rounds),
   push and pull balance, time budget, rest matched to rep range, no
-  movement reuse, fat-loss honesty, fully specified rows. The answer is
-  checked in the browser: header rows and half-filled rows are dropped,
+  movement reuse, fat-loss honesty, fully specified rows. It also states
+  the main-work budget in minutes for the session length.
+- **The answer is checked in the browser** (`cleanPlan`), against what the
+  model really sends: header rows and half-filled rows are dropped;
   repeated exercises and warm-up drills reused as working exercises are
-  removed, dashes become hyphens, guided mode keeps the form's own client
-  name, goal and duration, a placeholder name such as "Client" is blanked,
-  and the tool always prints its own disclaimer.
+  removed; a client who cannot jump (stated, knee pain, low intensity or
+  60+) gets no jumps or burpees, and knee or lower-back limitations remove
+  stretches such as child's pose or forward folds, topped up from the
+  engine; straight sets that overshoot the clock lose a fourth set, then
+  the last exercises, then a third set; tempo is kept only as digits on
+  counted lifts; a label shared by every row ("Circuit:") is removed;
+  names are Title Case; dashes become hyphens; commentary about how the
+  plan was produced is cut from the trainer notes; guided mode keeps the
+  form's own client name, goal and duration; a placeholder name such as
+  "Client" is blanked; and the tool always prints its own disclaimer.
+- **Speed.** A plan is a long answer, so the `workout` spec asks Gemini for
+  light reasoning (`thinkingConfig`, dropped automatically if a model
+  rejects it) and typically answers in about 4 seconds. A request that has
+  not answered in 11 seconds, or fails with a 5xx, is asked once more
+  inside a 26-second limit. A 429 (the free tier's rate limit) is never
+  retried: the browser uses the built-in engine instead, as it does for
+  any failure.
 - **Built-in engine** (`generateWorkout.ts`), new in the hub: the old tool
   showed an error when the model failed. The engine builds a session from
   an exercise library by the same rules: equipment by location, limitations
