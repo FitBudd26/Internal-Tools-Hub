@@ -147,7 +147,7 @@ export function fitToBudget(rows: Exercise[], budgetMin: number): Exercise[] {
 }
 
 /** Sentences about how the plan was produced ("no client name was provided") are not coaching notes. */
-const META_NOTE = /client name|no name|from the prompt|from the description|as instructed|the instructions|default profile|was (explicitly )?(set|provided|given|specified)|were (not )?(provided|given|specified)/i;
+const META_NOTE = /client name|no name|from the prompt|as instructed|the instructions|default profile|explicitly set/i;
 export const coachingOnly = (notes: string): string =>
   (notes.match(/[^.!?]+[.!?]*/g) ?? [notes])
     .map((sentence) => sentence.trim())
