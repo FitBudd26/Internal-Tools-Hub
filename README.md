@@ -17,12 +17,15 @@ tool with its embed snippet.
 | Pricing & Package Builder | `/pricing-package-builder/` | Migrated from pricing-package-builder.vercel.app: coaching format, niche, experience, services, program duration, income goal, hours and client capacity → three priced packages (Starter, Core, Premium), four strategy notes and a revenue projection, with Copy. The prices and revenue figures come from the tool's formula; Gemini writes the packages and notes around them, with the original copy as fallback | name + email |
 | One Rep Max Calculator | `/one-rep-max-calculator/` | Migrated from 1-rpm-calculator.vercel.app: exercise, weight (lbs or kg), reps and an optional training goal → the 1RM estimate (Epley), a six-formula comparison and the training load chart, all from formulas, plus guidance from Gemini: a read on the estimate, a warm-up ramp, a four-week plan and coaching tips, with built-in guidance as fallback | email |
 | Fitness Recipe Generator for Coaches & Gyms | `/recipe-generator/` | Same design → three distinct, goal-aligned recipes that honour every dietary restriction and the coach's notes (Gemini with a 40-recipe library as fallback), approximate nutrition, coach notes, a logo-branded PDF, disclaimer and a free-trial CTA | name + email (selections too once its form has the fields) |
+| Personal Trainer Intake Form Generator | `/intake-form-generator/` | Three screens: business profile (business type, specializations, clientele, coaching format, form length, free-text requirements) → lead gate → Gemini writes a client intake questionnaire for that profile (no canned form: the route validates with Zod, enforces 10-14 / 16-22 / 24-30 questions and makes one repair attempt), shown in the modal with edit, reorder, remove, add, regenerate, a client-ready PDF (US Letter or A4, optional coach name and logo) and the trial CTA | name + email + selections (once its form has the fields) |
 
 **Stack:** React 19 · TypeScript · Tailwind CSS v4 · Vite (multi-page) ·
-jsPDF (client-side PDF) · two Vercel serverless routes shared by every tool:
+jsPDF (client-side PDF) · three Vercel serverless routes:
 `api/track.ts` (HubSpot lead capture) and `api/generate.ts` (Gemini
 generation for hashtags, challenges and recipes; each tool keeps a
-deterministic engine as fallback so it works without a key).
+deterministic engine as fallback so it works without a key), plus
+`api/generate-intake.ts` (Gemini for the Intake Form Generator, validated
+with Zod; no canned fallback by design).
 
 Every tool uses the same shell: 536 px max width, `max-w-[536px] mx-auto
 p-4` wrapper, white card with soft shadow, 40 px inputs, 46 px primary
@@ -44,10 +47,11 @@ npm run preview   # serve the production build locally
 ## Deploying (Vercel)
 
 Import the repo as one Vercel project, framework Vite, root directory `/`.
-`api/` becomes the two serverless routes automatically; `vercel.json` raises
-`api/generate.ts` to a 30 s max duration. Env vars: `GEMINI_API_KEY` (AI
-hashtags; optional), plus the optional HubSpot overrides below. Free (Hobby)
-limits are more than enough, 2 of 12 functions, small static pages, but
+`api/` becomes the three serverless routes automatically; `vercel.json` raises
+`api/generate.ts` to a 30 s and `api/generate-intake.ts` to a 45 s max duration. Env vars: `GEMINI_API_KEY` (AI
+generation; optional for every tool except the Intake Form Generator, which
+has no fallback), plus the optional HubSpot overrides below. Free (Hobby)
+limits are more than enough, 3 of 12 functions, small static pages, but
 Hobby is for non-commercial use, so plan on Pro once the tools are live on
 fitbudd.com.
 
@@ -109,6 +113,7 @@ HUBSPOT_FORM_ID_GYM_NAME_GENERATOR            optional, per-tool form
 HUBSPOT_FORM_ID_AI_WORKOUT_GENERATOR          optional, per-tool form
 HUBSPOT_FORM_ID_PRICING_PACKAGE_BUILDER       optional, per-tool form
 HUBSPOT_FORM_ID_ONE_REP_MAX_CALCULATOR        optional, per-tool form
+HUBSPOT_FORM_ID_INTAKE_FORM_GENERATOR         optional, per-tool form
 HUBSPOT_PRIVATE_APP_TOKEN                     optional, authenticated secure-submit endpoint
 VITE_TRACK_IN_DEV                             dev only, 'true' sends events from `npm run dev`
 ```
@@ -174,6 +179,8 @@ What each tool sends:
   (`lead_magnet`), `cta_destination` (`fitbudd_self_signup`), `page_url`,
   `submitted_at`; then `pdf_download` and `cta_click` with the email. Its
   form is `b2222d23-1400-4bec-a812-e818740c59f5`.
+- **Personal Trainer Intake Form Generator**: see its section below. Its
+  form is `55a81db2-9d9b-4a2a-800f-d278463ea3fb`.
 
 HubSpot rejects a whole submission if it names a field the form does not
 define, so the route reads the form's public definition, sends only the
@@ -225,6 +232,7 @@ GEMINI_API_KEY   required for AI generation; without it each tool's built-in eng
                  works without renaming
 GEMINI_MODEL     optional, defaults to gemini-3.5-flash-lite (fast, generous free quota);
                  gemini-3.8-flash is the higher-quality free alternative
+GEMINI_MODEL_INTAKE  optional, model for the Intake Form Generator only (defaults to GEMINI_MODEL)
 ```
 
 `GET /api/generate` reports `keySource`, the env var name it found (never
@@ -551,6 +559,144 @@ Migrated from the standalone 1RPM-Calculator repo (a single `index.html` at
 - Copy Results, Regenerate guidance and Recalculate; the original CTA and
   "Powered by FitBudd" links with their UTM tags; a disclaimer.
 
+## Personal Trainer Intake Form Generator
+
+B2B lead magnet in the shared shell at `/intake-form-generator/`. Three
+screens in one 536 px card, all within the 580 px embed height:
+
+1. **Trainer configuration**: `Your Coaching Business` (dropdown),
+   `Coaching Specialization` and `Who Do You Coach?` (multi-select dropdowns,
+   up to six each), `Coaching Format`, `Form Length` (quick 10-14, standard
+   16-22, comprehensive 24-30) and a 60 px `Specific Questions or
+   Requirements` textarea (500 characters). `Generate My Intake Form` only
+   moves to the gate; Gemini is not called yet.
+2. **Lead gate**: `Your Custom Intake Form Is Almost Ready`, `Full Name`,
+   `Work Email` (format + disposable domains) and the privacy policy link
+   (no marketing tick box, by decision). `Create My Intake Form` sends the lead to HubSpot, then asks
+   Gemini, then opens the modal. Going back keeps every selection; closing
+   the modal leaves an `Open My Intake Form` button, no second generation.
+3. **Results modal** (`Your Custom Intake Form Is Ready`): editable title,
+   `N Questions · M Sections · T min`, the model's review notice, every
+   section and question (type badge, required mark, a sketch of the answer
+   area) with move up / down, edit (wording, type, required, options, help
+   text, rating labels), remove and `+ Add a question`; `PDF options` (coach
+   or business name, an optional PNG / JPG logo that never leaves the
+   browser, US Letter or A4); `Download PDF`; `Regenerate form` and `Change
+   settings`; coach notes; the disclaimer; and the CTA `Turn Your Intake
+   Form Into a Complete Coaching Experience` with three value points and
+   `Start Your 30-Day Free Trial`
+   (`utm_source=personal_trainer_intake_form_generator&utm_medium=tool_cta&utm_campaign=lead_conversion`).
+
+- **Generation is Gemini-only** (`api/generate-intake.ts`, `aiIntake.ts`).
+  There is no built-in question bank: when the route is not configured
+  (503), rate limited (429, shown as `We're experiencing high demand. Please
+  try generating your form again shortly.`) or returns an answer that fails
+  validation twice (502), the gate shows the message and a `Try Again`
+  button. The route validates the request with Zod (`schema.ts`), strips
+  control and markup characters from the trainer's free text and quotes it
+  as content guidance the model must not treat as instructions, builds the
+  prompt from the business type, specializations (each with the areas it
+  should draw from), clientele, format (each with its logistics questions),
+  length and a variation seed (regenerate), and asks for JSON in a fixed
+  response schema with `thinkingLevel: 'low'` (dropped if the model rejects
+  it). The answer is parsed with Zod and cleaned: dashes to hyphens,
+  duplicate questions dropped, choice questions without two options become
+  short text, acknowledgments are always required, rating labels default to
+  Low / High, ids reassigned (`q_001`…, `s_01`…). The total must fall in
+  the chosen range; otherwise one controlled repair attempt tells the model
+  what was wrong. After that a form still too long is trimmed of optional
+  questions from the end (`trimmed: true` in the response); one still too
+  short is a 502 `invalid`. Nothing is stored server-side.
+- **Free-tier protection**: 12 requests per IP per 10 minutes and 4
+  in-flight requests per function instance (429 `rate_limited`), a 429 from
+  Gemini passed through as 429, at most two model calls per request, 40 s
+  budget inside the 45 s function limit. `GEMINI_MODEL_INTAKE` picks a
+  model for this tool alone (default `GEMINI_MODEL`, then
+  `gemini-3.5-flash-lite`). `GET /api/generate-intake` reports `configured`,
+  `model`, `keySource` and the limits.
+- **Editing and the PDF share one object.** The modal edits the
+  questionnaire through `questionUtils.ts`; `generatePdf.ts` builds the PDF
+  from that same object with jsPDF (loaded on demand, compressed): orange
+  top band, `CLIENT INTAKE QUESTIONNAIRE` eyebrow, title, optional
+  `Prepared by`, description, question count and time, client name and
+  date fields, numbered sections with an orange rule, numbered questions
+  with the answer area each type needs (one writing line, a three-line
+  area, Yes / No boxes, one- or two-column choices (radio circles for
+  single-select, checkboxes for multi-select), a labelled 1-5
+  scale, a date line with the regional hint, a tick box for
+  acknowledgments), a running header and `Page X of Y` on every page, an
+  `Anything else you would like your coach to know?` area and a one-line
+  non-medical note. A question and its answer area never split across
+  pages and a heading never sits alone at a page foot. The FitBudd logo is
+  the small footer mark and the top-right mark unless the coach adds their
+  own logo. Text outside Helvetica's encoding (emoji) is dropped. File name
+  from the title, e.g. `online-coaching-client-intake-form.pdf`, fallback
+  `fitbudd-personal-trainer-intake-form.pdf`.
+- **Tests**: `node scripts/intake-pdf-check.mjs [out-dir] [questionnaire.json …]`
+  builds 10-, 20- and 28-question fixtures plus an edge-case form in Letter
+  and A4 and checks each PDF (valid file, page count, every question
+  present, page numbers on every page, client name and date fields, no
+  empty pages); `swift scripts/render-pdf-pages.swift file.pdf out-prefix`
+  renders the pages for a visual pass.
+  `BASE=http://localhost:5173 node scripts/intake-acceptance.mjs [out-dir]`
+  runs the acceptance test against a configured route (`npm run dev` with
+  `GEMINI_API_KEY` in `.env`, or a deployment): an online weight-loss coach
+  for busy professionals, an in-person strength coach for advanced
+  athletes, a beginner yoga instructor and a hybrid trainer for busy
+  parents; it checks ranges, unique ids, no duplicates, options on choice
+  questions, on-niche vocabulary (no one rep max questions on a yoga form)
+  and the pairwise difference between the personas, and saves each
+  questionnaire as JSON so the PDF check can build the real PDFs from them.
+- **HubSpot**: form `55a81db2-9d9b-4a2a-800f-d278463ea3fb` (set
+  `HUBSPOT_FORM_ID_INTAKE_FORM_GENERATOR` to point the tool elsewhere). The
+  route reads the form's public definition and sends only the fields it
+  defines. Today that is `email` and `firstname`, so the lead carries just
+  those two and the secondary events below are skipped. Add any of the
+  fields below to the form as single-line text contact properties
+  (Marketing → Forms, classic editor) and the route starts sending them on
+  the next submission; `GET /api/track` lists what the form still lacks
+  under `missingFields`. Events: `lead` (on
+  `Create My Intake Form`, before Gemini): `email`, `firstname`, `lastname`,
+  `coaching_business_type`, `coaching_specializations`, `target_clientele`,
+  `coaching_format`, `intake_form_length`, `intake_custom_requirements`,
+  `lead_magnet_source` (`personal_trainer_intake_form_generator`), `lead_magnet_type`
+  (`intake_form`), `tool_source`, `campaign` (`lead_magnet`),
+  `cta_destination`, `utm_source`, `utm_medium`, `utm_campaign`,
+  `utm_content`, `page_url`, `submitted_at`; then `generated`
+  (`form_generated`, `form_generated_at`, `generated_form_title`,
+  `question_count`), `regenerate` (`form_regenerated`,
+  `form_regenerated_at`), `pdf_download` (`pdf_downloaded`,
+  `pdf_downloaded_at`, `generated_form_title`) and `cta_click`
+  (`cta_clicked`, `cta_text`, `cta_url`, `cta_clicked_at`), each with the
+  email. The lead is sent once per email + settings; regenerating, editing
+  and downloading never resubmit it. Only the business profile goes to
+  Gemini, never the name or email. The tool generates blank
+  questionnaires, so no client answers ever reach HubSpot or the server.
+- **Attribution from the Webflow page.** The iframe cannot read the
+  parent page's UTM parameters or HubSpot cookie. Either append them to the
+  iframe `src` (`?utm_source=…`) or let the page send them: the tool posts
+  `{ type: 'fitbudd-tool:ready' }` to its parent on load and accepts
+  `{ type: 'fitbudd-tool:attribution', utm: { utm_source, utm_medium,
+  utm_campaign, utm_content }, pageUrl, hutk }` from `fitbudd.com`,
+  `www.fitbudd.com` and `*.webflow.io` origins only (`attribution.ts`); the
+  route forwards `hutk` as HubSpot submission context. Parent snippet for
+  the Webflow page:
+
+  ```html
+  <script>
+    window.addEventListener('message', function (e) {
+      if (!e.data || e.data.type !== 'fitbudd-tool:ready') return;
+      var p = new URLSearchParams(location.search);
+      var utm = {};
+      ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content'].forEach(function (k) {
+        if (p.get(k)) utm[k] = p.get(k);
+      });
+      var hutk = (document.cookie.match(/(?:^|; )hubspotutk=([a-f0-9]{32})/) || [])[1];
+      e.source.postMessage({ type: 'fitbudd-tool:attribution', utm: utm, pageUrl: location.href, hutk: hutk }, e.origin);
+    });
+  </script>
+  ```
+
 ## Structure
 
 ```
@@ -564,15 +710,18 @@ gym-name-generator/index.html
 ai-workout-generator/index.html
 pricing-package-builder/index.html
 one-rep-max-calculator/index.html
+intake-form-generator/index.html
 api/
   track.ts                         shared HubSpot route: per-tool form + fields
   generate.ts                      shared Gemini route: hashtags, challenge, recipes
+  generate-intake.ts               Intake Form Generator: Gemini + Zod validation, one repair
+                                   attempt, per-IP and in-flight limits (no canned fallback)
 src/
   shared/
     index.css                      Tailwind theme (FitBudd colours) + iframe rules
     tools.ts                       tool registry + Webflow embed snippet
     logo.ts                        FitBudd logo as base64 PNG (for PDFs)
-    disclaimers.ts                 recipe, challenge, workout and one rep max disclaimers
+    disclaimers.ts                 recipe, challenge, workout, one rep max and intake disclaimers
     components/                    SelectDropdown, MultiSelectDropdown, MultiSelectChips
                                    (≤5 options only), ToolModal, PdfDownloadButton,
                                    CTASection, HashMark, ToolMark, InstagramMark,
@@ -607,8 +756,19 @@ src/
                                    aiRecipes, generateRecipes (library), nutrition
                                    (estimator + protein rules), calorieTarget,
                                    generatePdf, tracking, types
+  tools/intake-form-generator/     IntakeFormGenerator (three screens), TrainerConfiguration,
+                                   EmailCaptureGate, IntakeResultsModal, QuestionnairePreview,
+                                   QuestionCard, QuestionEditor, icons, aiIntake (route client),
+                                   schema (Zod, shared with the route), questionUtils (edit
+                                   helpers), generatePdf (Letter / A4), attribution (UTM +
+                                   hutk from the parent page), tracking, types
+scripts/
+  intake-pdf-check.mjs             builds fixture PDFs (10 / 20 / 28 questions, edge cases) and checks them
+  intake-acceptance.mjs            four-persona acceptance test against a configured route
+  render-pdf-pages.swift           PDF pages → PNG on macOS, for a visual pass
+  fixtures/intake-samples.mjs      the PDF fixtures (test data only, never shipped)
 vite.config.ts                     multi-page build + dev middleware serving api/*.ts
-vercel.json                        30 s maxDuration for api/generate.ts
+vercel.json                        30 s maxDuration for api/generate.ts, 45 s for api/generate-intake.ts
 .env.example                       every env var, documented
 ```
 

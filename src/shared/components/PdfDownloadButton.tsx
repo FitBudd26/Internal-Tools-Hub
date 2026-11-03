@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 
 type State = 'idle' | 'busy' | 'done' | 'error';
 
@@ -7,6 +7,8 @@ interface PdfDownloadButtonProps {
   onDownload: () => Promise<string>;
   onDownloaded?: (fileName: string) => void;
   label?: string;
+  /** Optional icon shown before the label while idle. */
+  icon?: ReactNode;
   ariaLabel: string;
 }
 
@@ -15,6 +17,7 @@ export function PdfDownloadButton({
   onDownload,
   onDownloaded,
   label = 'Download PDF',
+  icon,
   ariaLabel,
 }: PdfDownloadButtonProps) {
   const [state, setState] = useState<State>('idle');
@@ -47,8 +50,9 @@ export function PdfDownloadButton({
       onClick={handleClick}
       aria-busy={state === 'busy'}
       aria-label={ariaLabel}
-      className="h-[46px] w-full rounded-xl bg-fb-orange text-sm font-semibold text-white transition-colors hover:bg-fb-accent-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fb-orange aria-busy:cursor-wait aria-busy:opacity-80"
+      className="flex h-[46px] w-full items-center justify-center gap-2 rounded-xl bg-fb-orange text-sm font-semibold text-white transition-colors hover:bg-fb-accent-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fb-orange aria-busy:cursor-wait aria-busy:opacity-80"
     >
+      {icon && state === 'idle' && <span className="shrink-0">{icon}</span>}
       {text}
     </button>
   );

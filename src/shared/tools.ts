@@ -73,6 +73,13 @@ export const TOOLS: ToolMeta[] = [
       'Goal-aligned recipe ideas for clients (Gemini with a built-in recipe library) with a branded PDF. Captures name + email.',
     fallbackHeight: 580,
   },
+  {
+    slug: 'intake-form-generator',
+    name: 'Personal Trainer Intake Form Generator',
+    description:
+      'Client intake questionnaires written by Gemini for the trainer\'s business type, specializations, clientele and coaching format (no canned form), editable in the results modal, with a client-ready PDF in US Letter or A4. Lead gate (name + email) before generation.',
+    fallbackHeight: 580,
+  },
 ];
 
 /** Webflow embed snippet (iframe-resizer v4, same pattern as the other FitBudd tools). */

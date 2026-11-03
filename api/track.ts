@@ -244,6 +244,56 @@ const TOOLS: Record<string, ToolConfig> = {
       },
     },
   },
+  'intake-form-generator': {
+    pageName: 'Personal Trainer Intake Form Generator',
+    formIdEnv: 'HUBSPOT_FORM_ID_INTAKE_FORM_GENERATOR',
+    // The form currently defines email + firstname only; add the properties below to it (README,
+    // "Personal Trainer Intake Form Generator") and the route starts sending them automatically.
+    defaultFormId: '55a81db2-9d9b-4a2a-800f-d278463ea3fb',
+    events: {
+      lead: {
+        primary: true,
+        fields: [
+          'email',
+          'firstname',
+          'lastname',
+          'coaching_business_type',
+          'coaching_specializations',
+          'target_clientele',
+          'coaching_format',
+          'intake_form_length',
+          'intake_custom_requirements',
+          'lead_magnet_source',
+          'lead_magnet_type',
+          'tool_source',
+          'campaign',
+          'cta_destination',
+          'utm_source',
+          'utm_medium',
+          'utm_campaign',
+          'utm_content',
+          'page_url',
+          'submitted_at',
+        ],
+      },
+      generated: {
+        primary: false,
+        fields: ['email', 'form_generated', 'form_generated_at', 'generated_form_title', 'question_count', 'tool_source', 'page_url'],
+      },
+      regenerate: {
+        primary: false,
+        fields: ['email', 'form_regenerated', 'form_regenerated_at', 'tool_source', 'page_url'],
+      },
+      pdf_download: {
+        primary: false,
+        fields: ['email', 'pdf_downloaded', 'pdf_downloaded_at', 'generated_form_title', 'tool_source', 'page_url'],
+      },
+      cta_click: {
+        primary: false,
+        fields: ['email', 'cta_clicked', 'cta_text', 'cta_url', 'cta_clicked_at', 'tool_source', 'page_url'],
+      },
+    },
+  },
 };
 
 function toolFields(cfg: ToolConfig): string[] {
@@ -330,6 +380,7 @@ const warned = new Set<string>();
  * whose definition is not public (HubSpot's newer form editor), otherwise unknown.
  */
 async function shapeFor(cfg: ToolConfig, portalId: string, formId: string): Promise<{ shape: FormShape | null; source: 'read' | 'assumed' | 'unknown' }> {
+  if (!formId) return { shape: null, source: 'unknown' };
   const read = await getFormShape(portalId, formId);
   if (read) return { shape: read, source: 'read' };
   if (cfg.knownFields) return { shape: { names: new Set(cfg.knownFields), required: [] }, source: 'assumed' };
@@ -371,7 +422,8 @@ export default async function handler(
       const all = toolFields(cfg);
       tools[slug] = {
         portalId,
-        formId,
+        formId: formId || null,
+        ...(formId ? {} : { warning: `no HubSpot form configured: set ${cfg.formIdEnv}` }),
         authenticated: Boolean(token),
         formDefinition: source,
         formFields: shape ? [...shape.names] : null,
@@ -401,6 +453,12 @@ export default async function handler(
 
     if (spec && fields) {
       const { portalId, formId, token } = resolveForm(cfg);
+      if (!formId) {
+        // Logged on every attempt so a missing form is impossible to miss in the Vercel logs.
+        console.warn(`[${tool}] no HubSpot form configured (${cfg.formIdEnv}); ${String(type)} event not sent`);
+        res.status(204).end();
+        return;
+      }
       const hsFields = spec.fields
         .filter((name) => typeof fields[name] === 'string')
         .map((name) => ({
@@ -431,6 +489,8 @@ export default async function handler(
             context: {
               pageUri: typeof fields.page_url === 'string' ? fields.page_url : '',
               pageName: cfg.pageName,
+              // HubSpot's visitor cookie, when the embedding page passed it in (never a form field itself).
+              ...(typeof fields.hutk === 'string' && /^[a-f0-9]{32}$/.test(fields.hutk) ? { hutk: fields.hutk } : {}),
             },
             ...(cfg.consentText ? { legalConsentOptions: { consent: { consentToProcess: true, text: cfg.consentText } } } : {}),
           }),
