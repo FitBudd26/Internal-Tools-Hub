@@ -27,7 +27,7 @@ import {
   generateIntakeRequestSchema,
   rawQuestionnaireSchema,
   type GenerateIntakeRequest,
-} from '../src/tools/intake-form-generator/schema';
+} from '../src/tools/intake-form-generator/schema.js';
 import {
   CHOICE_TYPES,
   FORM_LENGTH_LABELS,
@@ -36,8 +36,8 @@ import {
   type IntakeQuestion,
   type IntakeSection,
   type Questionnaire,
-} from '../src/tools/intake-form-generator/types';
-import { questionKey } from '../src/tools/intake-form-generator/questionUtils';
+} from '../src/tools/intake-form-generator/types.js';
+import { questionKey } from '../src/tools/intake-form-generator/questionUtils.js';
 
 declare const process: { env: Record<string, string | undefined> };
 

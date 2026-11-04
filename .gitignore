@@ -9,3 +9,5 @@ dist
 # Intake Form Generator test output (scripts/intake-acceptance.mjs, scripts/intake-pdf-check.mjs)
 .acceptance/
 .pdf-check/
+.vercel
+.env*

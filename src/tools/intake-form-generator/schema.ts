@@ -8,7 +8,7 @@ import {
   MAX_REQUIREMENTS,
   QUESTION_TYPES,
   SPECIALIZATIONS,
-} from './types';
+} from './types.js';
 
 /**
  * Zod schemas for the generation route: the request the browser sends and

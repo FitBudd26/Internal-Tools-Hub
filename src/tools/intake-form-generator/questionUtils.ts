@@ -1,5 +1,5 @@
-import type { IntakeQuestion, IntakeSection, Questionnaire } from './types';
-import { CHOICE_TYPES } from './types';
+import type { IntakeQuestion, IntakeSection, Questionnaire } from './types.js';
+import { CHOICE_TYPES } from './types.js';
 
 /** Pure helpers over the questionnaire object. The preview, the editor and the PDF all use the same object. */
 
