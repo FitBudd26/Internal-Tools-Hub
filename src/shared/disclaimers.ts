@@ -11,5 +11,11 @@ export const WORKOUT_DISCLAIMER =
 export const INTAKE_DISCLAIMER =
   'This questionnaire is a coaching intake template, not a validated medical screening instrument, a diagnosis tool or a legal waiver. Trainers should review the health-related and consent questions, adapt them to local requirements and their insurer\'s guidance, and refer clients to a qualified professional where appropriate.';
 
+export const ATKINS_DISCLAIMER =
+  'Recipes are for general information. Nutrition values may be estimates. Consult a qualified professional before making major dietary changes. Take extra care and seek individual advice if you are pregnant or breastfeeding, have a medical condition such as diabetes or kidney disease, or take medication affected by carbohydrate intake.';
+
+export const ATKINS_NON_AFFILIATION =
+  'FitBudd is not affiliated with, sponsored by or endorsed by Atkins Nutritionals, Inc. The Atkins name is used only to describe the dietary approach selected.';
+
 export const ONE_RM_DISCLAIMER =
   'A one rep max from a formula is an estimate, and the training guidance is general coaching information, not medical advice. Coaches should adapt loads to each client\'s training history, technique and health, use spotters or safety equipment for heavy sets, and stop a session if there is pain or any unusual symptom.';

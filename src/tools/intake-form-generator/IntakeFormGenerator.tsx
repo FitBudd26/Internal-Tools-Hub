@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ToolMark } from '../../shared/components/ToolMark';
 import { generateIntakeForm, type IntakeFailure } from './aiIntake';
-import { initAttribution } from './attribution';
+import { initAttribution } from '../../shared/lib/attribution';
 import { EmailCaptureGate } from './EmailCaptureGate';
 import { IntakeResultsModal } from './IntakeResultsModal';
 import { trackCtaClick, trackGenerated, trackLead, trackPdfDownload, trackRegenerated } from './tracking';
@@ -53,7 +53,7 @@ export function IntakeFormGenerator() {
   const sentLeadKey = useRef('');
 
   useEffect(() => {
-    initAttribution();
+    initAttribution('intake-form-generator');
   }, []);
 
   const currentKey = leadKey(config, lead);

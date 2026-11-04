@@ -10,3 +10,5 @@ dist
 .acceptance/
 .pdf-check/
 .vercel
+.acceptance-atkins/
+.pdf-check-atkins/

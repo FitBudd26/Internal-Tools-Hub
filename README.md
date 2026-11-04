@@ -17,15 +17,17 @@ tool with its embed snippet.
 | Pricing & Package Builder | `/pricing-package-builder/` | Migrated from pricing-package-builder.vercel.app: coaching format, niche, experience, services, program duration, income goal, hours and client capacity → three priced packages (Starter, Core, Premium), four strategy notes and a revenue projection, with Copy. The prices and revenue figures come from the tool's formula; Gemini writes the packages and notes around them, with the original copy as fallback | name + email |
 | One Rep Max Calculator | `/one-rep-max-calculator/` | Migrated from 1-rpm-calculator.vercel.app: exercise, weight (lbs or kg), reps and an optional training goal → the 1RM estimate (Epley), a six-formula comparison and the training load chart, all from formulas, plus guidance from Gemini: a read on the estimate, a warm-up ramp, a four-week plan and coaching tips, with built-in guidance as fallback | email |
 | Fitness Recipe Generator for Coaches & Gyms | `/recipe-generator/` | Same design → three distinct, goal-aligned recipes that honour every dietary restriction and the coach's notes (Gemini with a 40-recipe library as fallback), approximate nutrition, coach notes, a logo-branded PDF, disclaimer and a free-trial CTA | name + email (selections too once its form has the fields) |
+| Atkins Diet Recipe Generator | `/atkins-recipe-generator/` | Three screens: recipe preferences (Atkins 20 with its phase, Atkins 40, or a flexible daily net-carb target; meal type, proteins, cuisine, cooking time, restrictions, ingredients to avoid or use) → lead gate → Gemini writes three original low-carb recipes for that plan (no recipe library: the route validates with Zod, computes nutrition from the ingredient quantities with reference data, checks every recipe against the plan rules, restrictions, proteins and time, and asks again for any that fail), shown as three tabs with full details, Copy, a single-recipe or three-recipe PDF (US Letter or A4), regenerate and the trial CTA | name + email + selections (once its form has the fields) |
 | Personal Trainer Intake Form Generator | `/intake-form-generator/` | Three screens: business profile (business type, specializations, clientele, coaching format, form length, free-text requirements) → lead gate → Gemini writes a client intake questionnaire for that profile (no canned form: the route validates with Zod, enforces 10-14 / 16-22 / 24-30 questions and makes one repair attempt), shown in the modal with edit, reorder, remove, add, regenerate, a client-ready PDF (US Letter or A4, optional coach name and logo) and the trial CTA | name + email + selections (once its form has the fields) |
 
 **Stack:** React 19 · TypeScript · Tailwind CSS v4 · Vite (multi-page) ·
-jsPDF (client-side PDF) · three Vercel serverless routes:
+jsPDF (client-side PDF) · four Vercel serverless routes:
 `api/track.ts` (HubSpot lead capture) and `api/generate.ts` (Gemini
 generation for hashtags, challenges and recipes; each tool keeps a
 deterministic engine as fallback so it works without a key), plus
-`api/generate-intake.ts` (Gemini for the Intake Form Generator, validated
-with Zod; no canned fallback by design).
+`api/generate-intake.ts` (Gemini for the Intake Form Generator) and
+`api/generate-recipes.ts` (Gemini for the Atkins Diet Recipe Generator),
+both validated with Zod and without a canned fallback by design.
 
 Every tool uses the same shell: 536 px max width, `max-w-[536px] mx-auto
 p-4` wrapper, white card with soft shadow, 40 px inputs, 46 px primary
@@ -47,11 +49,13 @@ npm run preview   # serve the production build locally
 ## Deploying (Vercel)
 
 Import the repo as one Vercel project, framework Vite, root directory `/`.
-`api/` becomes the three serverless routes automatically; `vercel.json` raises
-`api/generate.ts` to a 30 s and `api/generate-intake.ts` to a 45 s max duration. Env vars: `GEMINI_API_KEY` (AI
-generation; optional for every tool except the Intake Form Generator, which
-has no fallback), plus the optional HubSpot overrides below. Free (Hobby)
-limits are more than enough, 3 of 12 functions, small static pages, but
+`api/` becomes the four serverless routes automatically; `vercel.json` raises
+`api/generate.ts` to a 30 s and `api/generate-intake.ts` and
+`api/generate-recipes.ts` to a 45 s max duration. Env vars: `GEMINI_API_KEY` (AI
+generation; optional for every tool except the Intake Form Generator and the
+Atkins Diet Recipe Generator, which have no fallback), plus the optional
+HubSpot overrides below. Free (Hobby)
+limits are more than enough, 4 of 12 functions, small static pages, but
 Hobby is for non-commercial use, so plan on Pro once the tools are live on
 fitbudd.com.
 
@@ -114,6 +118,7 @@ HUBSPOT_FORM_ID_AI_WORKOUT_GENERATOR          optional, per-tool form
 HUBSPOT_FORM_ID_PRICING_PACKAGE_BUILDER       optional, per-tool form
 HUBSPOT_FORM_ID_ONE_REP_MAX_CALCULATOR        optional, per-tool form
 HUBSPOT_FORM_ID_INTAKE_FORM_GENERATOR         optional, per-tool form
+HUBSPOT_FORM_ID_ATKINS_RECIPE_GENERATOR       required for that tool: it has no default form yet
 HUBSPOT_PRIVATE_APP_TOKEN                     optional, authenticated secure-submit endpoint
 VITE_TRACK_IN_DEV                             dev only, 'true' sends events from `npm run dev`
 ```
@@ -181,6 +186,8 @@ What each tool sends:
   form is `b2222d23-1400-4bec-a812-e818740c59f5`.
 - **Personal Trainer Intake Form Generator**: see its section below. Its
   form is `55a81db2-9d9b-4a2a-800f-d278463ea3fb`.
+- **Atkins Diet Recipe Generator**: see its section below; it has no
+  default form yet, so set `HUBSPOT_FORM_ID_ATKINS_RECIPE_GENERATOR` first.
 
 HubSpot rejects a whole submission if it names a field the form does not
 define, so the route reads the form's public definition, sends only the
@@ -233,6 +240,7 @@ GEMINI_API_KEY   required for AI generation; without it each tool's built-in eng
 GEMINI_MODEL     optional, defaults to gemini-3.5-flash-lite (fast, generous free quota);
                  gemini-3.8-flash is the higher-quality free alternative
 GEMINI_MODEL_INTAKE  optional, model for the Intake Form Generator only (defaults to GEMINI_MODEL)
+GEMINI_MODEL_ATKINS  optional, model for the Atkins Diet Recipe Generator only (defaults to GEMINI_MODEL)
 ```
 
 `GET /api/generate` reports `keySource`, the env var name it found (never
@@ -697,6 +705,171 @@ screens in one 536 px card, all within the 580 px embed height:
   </script>
   ```
 
+## Atkins Diet Recipe Generator
+
+B2B lead magnet in the shared shell at `/atkins-recipe-generator/`. Three
+screens in one 536 px card, all within the 580 px embed height:
+
+1. **Recipe preferences**: `Atkins Plan` (Atkins 20, Atkins 40, Flexible
+   Low-Carb; default Atkins 20), `Atkins Phase` (shown only for Atkins 20:
+   Induction, Ongoing Weight Loss, Pre-Maintenance, Lifetime Maintenance;
+   the other plans show their framework in that slot instead), `Meal Type`
+   (Breakfast, Lunch, Dinner, Snack, Dessert, Meal Prep), `Preferred
+   Protein` (multi-select, up to five; Eggs and Dairy separate, Fish and
+   Seafood separate, `No Preference` exclusive), `Cuisine` (nine options),
+   `Cooking Time` (under 15 / 30 / 45 minutes or no preference), and an
+   `Additional Preferences` section: `Dietary Restrictions` (multi-select;
+   `No Restrictions` exclusive), the daily net-carb range for the Flexible
+   plan (20-30, 30-50, 50-75 or 75-100 g), `Ingredients to Avoid` and
+   `Ingredients Available` (160 characters each). A protein that conflicts
+   with a restriction (Chicken with Vegan, Dairy with Dairy-Free) is named in
+   an amber notice and left out; the restriction wins. There is no serving
+   size input: every recipe is written for one standard serving and says so.
+   `Generate Recipes` only moves to the gate; Gemini is not called yet.
+2. **Lead gate**: `Your Low-Carb Recipes Are Almost Ready`, `Full Name`,
+   `Email Address` (format + disposable domains) and the privacy policy link
+   (no marketing tick box, by the same decision as the intake tool). `Get My
+   Recipes` sends the lead to HubSpot, then asks Gemini, then opens the
+   modal; nothing is shown unless three recipes pass validation. Going back
+   keeps every selection; closing the modal leaves an `Open My Recipes`
+   button, no second generation.
+3. **Results modal** (`Your Atkins-Friendly Recipes Are Ready`, subtitle plan
+   · meal · cuisine): three recipe tabs (name, meal type, total time, net
+   carbs, `Meets plan guidelines` or `Verify nutrition`), the selected
+   recipe in full (description, times, plan fit line with the review status,
+   ingredients for 1 serving, numbered instructions, the six nutrition
+   figures with an honest status line, substitutions, the model's note),
+   `PDF page size` (US Letter / A4), `Download PDF` (the selected recipe),
+   `Copy Recipe`, `Download All 3 (PDF)`, `Generate More Recipes`,
+   `Change preferences`, the dietary note and the non-affiliation notice,
+   and the CTA `Turn Recipes Into a Complete Coaching Experience` with three
+   value points and `Start Your 30-Day Free Trial`
+   (`utm_source=atkins_recipe_generator&utm_medium=tool_cta&utm_campaign=lead_conversion`).
+
+- **Atkins logic lives in `atkinsRules.ts`, apart from the prompt.** Each
+  plan and phase is a profile: the daily net-carb framework (about 20 g for
+  Induction; typically 25-50 g, 50-80 g and 60-100 g for phases 2 to 4;
+  about 40 g for Atkins 40; the user's own range for Flexible, which is
+  never called an Atkins plan), the foods to build on, the foods allowed in
+  measured portions (nuts, seeds, berries and plain dairy from Phase 2;
+  fruit, legumes, starchy vegetables and whole grains in small portions
+  from Phase 3 and on Atkins 40), the foods to leave out, and regex rules
+  that enforce them on ingredient names (grains and flours, starchy
+  vegetables, legumes, nuts and seeds, berries, higher-carb fruit, milk and
+  yogurt, sugars and sweetened sauces) with portion caps for the measured
+  groups. The 20 g or 40 g is a DAILY budget: one main meal may use about
+  half of it, a snack or dessert under a third, and a recipe over that
+  guide is rejected rather than labelled compatible. The same module holds
+  the restriction rules (Vegetarian, Vegan, Dairy-Free, Gluten-Free,
+  Nut-Free, Egg-Free, with allow-lists so almond milk, coconut cream, flax
+  eggs or tamari do not trip them), the avoid-list check, the selected
+  protein check (a recipe must use a selected protein and must not sneak
+  in another main protein), the cooking-time limit and the per-meal
+  net-carb guide. `planPromptLines` turns the profile into prompt text.
+- **Nutrition is computed, not invented** (`nutrition.ts`). Every
+  ingredient the model returns carries a numeric quantity and a unit (g,
+  ml, tbsp, tsp, cup, piece, slice, clove, pinch, to taste). A reference
+  table of about 290 foods (about 1,080 names) with USDA FoodData Central style figures per
+  100 g (kcal, protein, total carbs, fiber, fat) plus unit weights converts
+  each line to grams and sums calories, protein, total carbs, fiber, net
+  carbs (total minus fiber; erythritol, allulose, xylitol and maltitol carry
+  their own net figure instead of being subtracted wholesale) and fat.
+  Seasonings count as recognised but weightless; one-letter slips in longer
+  names still match. When at least 90% of the ingredient weight is covered
+  the figures are shown as `calculated` (approximate); otherwise the
+  model's own estimate is used only if it is internally consistent and is
+  labelled `AI estimate, not verified`; otherwise the recipe shows
+  `Nutrition not calculated`. The status drives the review badge:
+  `meets_plan_guidelines` only for calculated recipes, otherwise
+  `requires_nutrition_verification`.
+- **Generation is Gemini-only** (`api/generate-recipes.ts`, `aiRecipes.ts`).
+  The route validates the request with Zod (`schema.ts`), strips control and
+  markup characters from the free text, builds the prompt from the spec's
+  recipe-developer instruction, the plan profile, a cuisine direction
+  (Indian: tandoori, paneer, cauliflower; Mediterranean: grilled fish,
+  olive oil, herbs; Mexican: fajita bowls, lettuce tacos, avocado; and so
+  on) and a meal-type direction, and asks for JSON in a fixed response
+  schema with structured ingredients, a nutrition estimate and
+  substitutions (`thinkingLevel: 'low'`, dropped if the model rejects it).
+  Each returned recipe is cleaned, its nutrition computed, and it is judged
+  by `checkRecipe`; near-duplicates of an accepted recipe (same main
+  ingredients) are rejected too. Recipes that pass are kept; a second and,
+  if needed, third call asks only for the missing ones, naming the rejected
+  recipes and why. Fewer than three after that is a 502 `invalid`, and the
+  gate shows `We couldn't generate your recipes right now. Please try
+  again.` with a `Try Again` button. Rate limits: 12 requests per IP per
+  10 minutes and 4 in flight per instance (429), a 429 from Gemini passed
+  through, at most three model calls per request, 40 s budget inside the
+  45 s function limit. `GEMINI_MODEL_ATKINS` picks a model for this tool
+  alone (default `GEMINI_MODEL`, then `gemini-3.5-flash-lite`, a free-tier
+  Flash model; the route never switches models on its own).
+  `GET /api/generate-recipes` reports `configured`, `model`, `keySource`
+  and the limits. Nothing is stored server-side; the user's name and email
+  never reach Gemini.
+- **One recipe object feeds the tabs, the copy text and the PDF**
+  (`recipeUtils.ts`, `generatePdf.ts`). The PDF (jsPDF, compressed) has an
+  orange top band, the FitBudd logo, a `LOW-CARB RECIPE` eyebrow, the recipe
+  title (or `Low-Carb Recipe Collection`), the plan / phase, meal type,
+  cuisine and times, the description, a tinted plan-fit box, ingredients for
+  one serving, numbered instructions, a six-cell nutrition table with the
+  status line, substitutions, the model's note, an `Important dietary notes`
+  block (the general note, the pregnancy / medical / medication precaution
+  and the non-affiliation notice), a running header and `Page X of Y` on
+  every page. Headings never sit alone at a page foot. File names:
+  `atkins-<recipe-name>.pdf` for one recipe, `atkins-low-carb-recipes.pdf`
+  for the collection.
+- **Tests**: `node scripts/atkins-pdf-check.mjs [out-dir] [recipe-set.json …]`
+  builds a three-recipe collection, a long-names-and-steps set with special
+  characters and a set with every nutrition status, as the collection and as
+  single-recipe PDFs in Letter and A4, and checks each (valid file, page
+  count, every title, first ingredient and first step present, the section
+  headings, the net-carb cell, the dietary notes, page numbers, file names);
+  `swift scripts/render-pdf-pages.swift file.pdf out-prefix` renders pages
+  for a visual pass. `BASE=http://localhost:5173 node
+  scripts/atkins-acceptance.mjs [out-dir]` runs the spec's four scenarios
+  against a configured route: Atkins 20 Phase 1 dinner with chicken,
+  Mediterranean, under 30 minutes (no rice, pasta or starchy sides); Atkins
+  20 Phase 2 breakfast with eggs and dairy, American, under 15 minutes;
+  Atkins 40 lunch with fish and seafood, Asian, under 30 minutes; and an
+  Induction dinner that is dairy-free and nut-free. It checks three distinct
+  recipes, quantities, instructions, time, nutrition status, the meal
+  guide, proteins, cuisine and excluded foods, compares the scenarios
+  pairwise, and saves the sets as JSON for the PDF check.
+- **HubSpot**: this tool needs its own form. Create one in HubSpot
+  (Marketing → Forms; the classic editor exposes the public definition the
+  route reads) with `email` and `firstname`, plus any of the fields below
+  as single-line text contact properties, and set
+  `HUBSPOT_FORM_ID_ATKINS_RECIPE_GENERATOR` on Vercel (or paste the GUID
+  into `defaultFormId` in `api/track.ts`). Until then `GET /api/track`
+  shows a warning for the tool and its events are logged and skipped, never
+  sent to another tool's form. None of the custom fields exist as contact
+  properties yet, except `internal_src` (the portal's "page or CTA that
+  sourced this lead") and the UTM properties, which the lead also carries.
+  Events: `lead` (on `Get My Recipes`, before Gemini): `email`,
+  `firstname`, `lastname`, `atkins_plan`, `atkins_phase` (the phase, the
+  flexible range, or `Not applicable`), `meal_type`, `preferred_proteins`,
+  `cuisine`, `cooking_time`, `dietary_restrictions`, `lead_magnet_source`
+  and `tool_source` and `internal_src` (`atkins_recipe_generator`),
+  `lead_magnet_type` (`atkins_recipes`), `campaign` (`lead_magnet`),
+  `cta_destination`, `utm_source`, `utm_medium`, `utm_campaign`,
+  `utm_content`, `page_url`, `submitted_at`; then `generated`
+  (`recipes_generated`, `recipes_generated_at`, `generated_recipes`),
+  `regenerate` (`recipes_regenerated`, `recipes_regenerated_at`,
+  `generated_recipes`), `pdf_download` (`pdf_downloaded`,
+  `pdf_downloaded_at`, `pdf_file_name`) and `cta_click` (`cta_clicked`,
+  `cta_text`, `cta_url`, `cta_clicked_at`), each with the email. The lead
+  is sent once per email + preferences; regenerating and downloading never
+  resubmit it. Attribution from the Webflow page works exactly as for the
+  intake tool (`src/shared/lib/attribution.ts`, same parent snippet).
+- **Safety copy**: the modal and the PDF carry `Recipes are for general
+  information. Nutrition values may be estimates. Consult a qualified
+  professional before making major dietary changes.`, the extra precaution
+  for pregnancy, medical conditions and medication affected by carbohydrate
+  intake, and a notice that FitBudd is not affiliated with or endorsed by
+  Atkins Nutritionals. The prompt forbids fat-loss, metabolic and medical
+  claims, ketosis guarantees, copied recipes and Atkins branding; the tool
+  asks for no medical history.
+
 ## Structure
 
 ```
@@ -711,17 +884,20 @@ ai-workout-generator/index.html
 pricing-package-builder/index.html
 one-rep-max-calculator/index.html
 intake-form-generator/index.html
+atkins-recipe-generator/index.html
 api/
   track.ts                         shared HubSpot route: per-tool form + fields
   generate.ts                      shared Gemini route: hashtags, challenge, recipes
   generate-intake.ts               Intake Form Generator: Gemini + Zod validation, one repair
                                    attempt, per-IP and in-flight limits (no canned fallback)
+  generate-recipes.ts              Atkins Diet Recipe Generator: Gemini + Zod, computed nutrition,
+                                   plan-rule checks, up to three calls (no canned fallback)
 src/
   shared/
     index.css                      Tailwind theme (FitBudd colours) + iframe rules
     tools.ts                       tool registry + Webflow embed snippet
     logo.ts                        FitBudd logo as base64 PNG (for PDFs)
-    disclaimers.ts                 recipe, challenge, workout, one rep max and intake disclaimers
+    disclaimers.ts                 recipe, challenge, workout, one rep max, intake and Atkins disclaimers
     components/                    SelectDropdown, MultiSelectDropdown, MultiSelectChips
                                    (≤5 options only), ToolModal, PdfDownloadButton,
                                    CTASection, HashMark, ToolMark, InstagramMark,
@@ -729,6 +905,7 @@ src/
     lib/tracking.ts                postEvent, email validation (format + disposable
                                    domains blocked), trial URL
     lib/copy.ts                    clipboard helper with iframe fallback
+    lib/attribution.ts             UTM + hutk from the embedding page (postMessage, origin-checked)
   hub/                             index page
   tools/hashtag-generator/         HashtagGenerator, ResultsModal, PlatformHashtagBlock,
                                    generateHashtags, aiHashtags, tracking, types
@@ -760,15 +937,23 @@ src/
                                    EmailCaptureGate, IntakeResultsModal, QuestionnairePreview,
                                    QuestionCard, QuestionEditor, icons, aiIntake (route client),
                                    schema (Zod, shared with the route), questionUtils (edit
-                                   helpers), generatePdf (Letter / A4), attribution (UTM +
-                                   hutk from the parent page), tracking, types
+                                   helpers), generatePdf (Letter / A4), tracking, types
+  tools/atkins-recipe-generator/   AtkinsRecipeGenerator (three screens), RecipeInputForm,
+                                   LeadCaptureGate, RecipeResultsModal, RecipeDetails,
+                                   NutritionSummary, aiRecipes (route client), schema (Zod,
+                                   shared with the route), atkinsRules (plan / phase profiles,
+                                   restriction and protein rules, checks), nutrition (reference
+                                   data + calculator), recipeUtils, generatePdf, tracking, types
 scripts/
   intake-pdf-check.mjs             builds fixture PDFs (10 / 20 / 28 questions, edge cases) and checks them
   intake-acceptance.mjs            four-persona acceptance test against a configured route
   render-pdf-pages.swift           PDF pages → PNG on macOS, for a visual pass
   fixtures/intake-samples.mjs      the PDF fixtures (test data only, never shipped)
+  atkins-pdf-check.mjs             builds collection + single-recipe PDFs from fixtures and checks them
+  atkins-acceptance.mjs            the spec's four scenarios against a configured route
+  fixtures/atkins-samples.mjs      the Atkins PDF fixtures (test data only, never shipped)
 vite.config.ts                     multi-page build + dev middleware serving api/*.ts
-vercel.json                        30 s maxDuration for api/generate.ts, 45 s for api/generate-intake.ts
+vercel.json                        30 s maxDuration for api/generate.ts, 45 s for the intake and recipes routes
 .env.example                       every env var, documented
 ```
 

@@ -94,6 +94,7 @@ export default defineConfig({
         'pricing-package-builder': 'pricing-package-builder/index.html',
         'one-rep-max-calculator': 'one-rep-max-calculator/index.html',
         'intake-form-generator': 'intake-form-generator/index.html',
+        'atkins-recipe-generator': 'atkins-recipe-generator/index.html',
       },
     },
   },

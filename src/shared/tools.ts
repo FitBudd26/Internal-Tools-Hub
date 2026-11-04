@@ -80,6 +80,13 @@ export const TOOLS: ToolMeta[] = [
       'Client intake questionnaires written by Gemini for the trainer\'s business type, specializations, clientele and coaching format (no canned form), editable in the results modal, with a client-ready PDF in US Letter or A4. Lead gate (name + email) before generation.',
     fallbackHeight: 580,
   },
+  {
+    slug: 'atkins-recipe-generator',
+    name: 'Atkins Diet Recipe Generator',
+    description:
+      'Three original low-carb recipes from Gemini for the selected Atkins plan and phase (Atkins 20 phases 1-4, Atkins 40, or a flexible net-carb target), meal type, proteins, cuisine, cooking time and restrictions; nutrition computed from the ingredient quantities, every recipe checked against the plan rules, copy / PDF (single or all three) in US Letter or A4. Lead gate (name + email) before generation.',
+    fallbackHeight: 580,
+  },
 ];
 
 /** Webflow embed snippet (iframe-resizer v4, same pattern as the other FitBudd tools). */

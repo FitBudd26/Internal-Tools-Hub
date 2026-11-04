@@ -1,7 +1,7 @@
 import type { LeadDetails, Questionnaire, TrainerConfig } from './types';
 import { FORM_LENGTH_LABELS } from './types';
 import { postEvent, trialUrl } from '../../shared/lib/tracking';
-import { attributionFields } from './attribution';
+import { attributionFields } from '../../shared/lib/attribution';
 import { countQuestions } from './questionUtils';
 
 export const TOOL = 'intake-form-generator';

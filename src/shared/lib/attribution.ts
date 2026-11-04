@@ -1,5 +1,5 @@
 /**
- * Attribution for HubSpot. The tool runs in a cross-origin iframe, so it
+ * Attribution for HubSpot, shared by every tool. A tool runs in a cross-origin iframe, so it
  * cannot read the Webflow page's URL, UTM parameters or HubSpot cookie
  * itself. Two legitimate sources are used:
  *
@@ -12,7 +12,7 @@
  * Nothing here reaches into the parent document.
  */
 
-import { currentPageUrl } from '../../shared/lib/tracking';
+import { currentPageUrl } from './tracking';
 
 const UTM_KEYS = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content'] as const;
 type UtmKey = (typeof UTM_KEYS)[number];
@@ -30,7 +30,7 @@ interface ParentAttribution {
 const fromParent: ParentAttribution = { utm: {}, pageUrl: '', hutk: '' };
 let listening = false;
 
-export function initAttribution(): void {
+export function initAttribution(tool: string): void {
   if (listening || typeof window === 'undefined') return;
   listening = true;
   window.addEventListener('message', (e: MessageEvent) => {
@@ -50,7 +50,7 @@ export function initAttribution(): void {
   });
   if (window.parent !== window) {
     try {
-      window.parent.postMessage({ type: 'fitbudd-tool:ready', tool: 'intake-form-generator' }, '*');
+      window.parent.postMessage({ type: 'fitbudd-tool:ready', tool }, '*');
     } catch {
       /* no parent to tell */
     }

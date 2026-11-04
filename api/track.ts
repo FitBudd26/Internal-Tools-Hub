@@ -294,6 +294,59 @@ const TOOLS: Record<string, ToolConfig> = {
       },
     },
   },
+  'atkins-recipe-generator': {
+    pageName: 'Atkins Diet Recipe Generator',
+    formIdEnv: 'HUBSPOT_FORM_ID_ATKINS_RECIPE_GENERATOR',
+    // No form yet: create one in HubSpot (README, "Atkins Diet Recipe Generator") and set
+    // HUBSPOT_FORM_ID_ATKINS_RECIPE_GENERATOR on Vercel, or paste its GUID here. Until then this
+    // tool's submissions are logged and skipped, never sent to another tool's form.
+    defaultFormId: '',
+    events: {
+      lead: {
+        primary: true,
+        fields: [
+          'email',
+          'firstname',
+          'lastname',
+          'atkins_plan',
+          'atkins_phase',
+          'meal_type',
+          'preferred_proteins',
+          'cuisine',
+          'cooking_time',
+          'dietary_restrictions',
+          'lead_magnet_source',
+          'lead_magnet_type',
+          'tool_source',
+          'internal_src',
+          'campaign',
+          'cta_destination',
+          'utm_source',
+          'utm_medium',
+          'utm_campaign',
+          'utm_content',
+          'page_url',
+          'submitted_at',
+        ],
+      },
+      generated: {
+        primary: false,
+        fields: ['email', 'recipes_generated', 'recipes_generated_at', 'generated_recipes', 'tool_source', 'page_url'],
+      },
+      regenerate: {
+        primary: false,
+        fields: ['email', 'recipes_regenerated', 'recipes_regenerated_at', 'generated_recipes', 'tool_source', 'page_url'],
+      },
+      pdf_download: {
+        primary: false,
+        fields: ['email', 'pdf_downloaded', 'pdf_downloaded_at', 'pdf_file_name', 'tool_source', 'page_url'],
+      },
+      cta_click: {
+        primary: false,
+        fields: ['email', 'cta_clicked', 'cta_text', 'cta_url', 'cta_clicked_at', 'tool_source', 'page_url'],
+      },
+    },
+  },
 };
 
 function toolFields(cfg: ToolConfig): string[] {
