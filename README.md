@@ -18,16 +18,18 @@ tool with its embed snippet.
 | One Rep Max Calculator | `/one-rep-max-calculator/` | Migrated from 1-rpm-calculator.vercel.app: exercise, weight (lbs or kg), reps and an optional training goal → the 1RM estimate (Epley), a six-formula comparison and the training load chart, all from formulas, plus guidance from Gemini: a read on the estimate, a warm-up ramp, a four-week plan and coaching tips, with built-in guidance as fallback | email |
 | Fitness Recipe Generator for Coaches & Gyms | `/recipe-generator/` | Same design → three distinct, goal-aligned recipes that honour every dietary restriction and the coach's notes (Gemini with a 40-recipe library as fallback), approximate nutrition, coach notes, a logo-branded PDF, disclaimer and a free-trial CTA | name + email (selections too once its form has the fields) |
 | Atkins Diet Recipe Generator | `/atkins-recipe-generator/` | Three screens: recipe preferences (Atkins 20 with its phase, Atkins 40, or a flexible daily net-carb target; meal type, proteins, cuisine, cooking time, restrictions, ingredients to avoid or use) → lead gate → Gemini writes three original low-carb recipes for that plan (no recipe library: the route validates with Zod, computes nutrition from the ingredient quantities with reference data, checks every recipe against the plan rules, restrictions, proteins and time, and asks again for any that fail), shown as three tabs with full details, Copy, a single-recipe or three-recipe PDF (US Letter or A4), regenerate and the trial CTA | name + email + selections (once its form has the fields) |
+| Fitness Content Calendar Generator | `/content-calendar-generator/` | Three screens: business type, niches, audience, platforms, goals, duration (7 / 14 / 30 days), with posts per week, tone, formats, offer, promotions, start date, language and instructions under Advanced Preferences → lead gate → the tool plans the schedule (local calendar dates on the frequency's weekdays, pillar balance for the goals, platform and format per slot) and Gemini writes every post in chunks (topic, hook, caption, creative direction, CTA, hashtags, production notes, a version for the second platform), validated and repaired; a calendar grid or list, each post in full with edit, copy and per-post rewrite, PDF, CSV and .ics exports, regenerate and the trial CTA | name + email + selections (once its form has the fields) |
 | Personal Trainer Intake Form Generator | `/intake-form-generator/` | Three screens: business profile (business type, specializations, clientele, coaching format, form length, free-text requirements) → lead gate → Gemini writes a client intake questionnaire for that profile (no canned form: the route validates with Zod, enforces 10-14 / 16-22 / 24-30 questions and makes one repair attempt), shown in the modal with edit, reorder, remove, add, regenerate, a client-ready PDF (US Letter or A4, optional coach name and logo) and the trial CTA | name + email + selections (once its form has the fields) |
 
 **Stack:** React 19 · TypeScript · Tailwind CSS v4 · Vite (multi-page) ·
-jsPDF (client-side PDF) · four Vercel serverless routes:
+jsPDF (client-side PDF) · five Vercel serverless routes:
 `api/track.ts` (HubSpot lead capture) and `api/generate.ts` (Gemini
 generation for hashtags, challenges and recipes; each tool keeps a
 deterministic engine as fallback so it works without a key), plus
-`api/generate-intake.ts` (Gemini for the Intake Form Generator) and
-`api/generate-recipes.ts` (Gemini for the Atkins Diet Recipe Generator),
-both validated with Zod and without a canned fallback by design.
+`api/generate-intake.ts` (Gemini for the Intake Form Generator),
+`api/generate-recipes.ts` (Gemini for the Atkins Diet Recipe Generator) and
+`api/generate-calendar.ts` (Gemini for the Fitness Content Calendar
+Generator), all validated with Zod and without a canned fallback by design.
 
 Every tool uses the same shell: 536 px max width, `max-w-[536px] mx-auto
 p-4` wrapper, white card with soft shadow, 40 px inputs, 46 px primary
@@ -49,13 +51,14 @@ npm run preview   # serve the production build locally
 ## Deploying (Vercel)
 
 Import the repo as one Vercel project, framework Vite, root directory `/`.
-`api/` becomes the four serverless routes automatically; `vercel.json` raises
-`api/generate.ts` to a 30 s and `api/generate-intake.ts` and
-`api/generate-recipes.ts` to a 45 s max duration. Env vars: `GEMINI_API_KEY` (AI
-generation; optional for every tool except the Intake Form Generator and the
-Atkins Diet Recipe Generator, which have no fallback), plus the optional
-HubSpot overrides below. Free (Hobby)
-limits are more than enough, 4 of 12 functions, small static pages, but
+`api/` becomes the five serverless routes automatically; `vercel.json` raises
+`api/generate.ts` to a 30 s, `api/generate-intake.ts` and
+`api/generate-recipes.ts` to a 45 s and `api/generate-calendar.ts` to a
+60 s max duration. Env vars: `GEMINI_API_KEY` (AI generation; optional for
+every tool except the Intake Form, Atkins Recipe and Content Calendar
+generators, which have no fallback), plus the optional HubSpot overrides
+below. Free (Hobby)
+limits are more than enough, 5 of 12 functions, small static pages, but
 Hobby is for non-commercial use, so plan on Pro once the tools are live on
 fitbudd.com.
 
@@ -119,6 +122,7 @@ HUBSPOT_FORM_ID_PRICING_PACKAGE_BUILDER       optional, per-tool form
 HUBSPOT_FORM_ID_ONE_REP_MAX_CALCULATOR        optional, per-tool form
 HUBSPOT_FORM_ID_INTAKE_FORM_GENERATOR         optional, per-tool form
 HUBSPOT_FORM_ID_ATKINS_RECIPE_GENERATOR       optional, per-tool form
+HUBSPOT_FORM_ID_CONTENT_CALENDAR_GENERATOR    required for that tool: it has no default form yet
 HUBSPOT_PRIVATE_APP_TOKEN                     optional, authenticated secure-submit endpoint
 VITE_TRACK_IN_DEV                             dev only, 'true' sends events from `npm run dev`
 ```
@@ -188,6 +192,8 @@ What each tool sends:
   form is `55a81db2-9d9b-4a2a-800f-d278463ea3fb`.
 - **Atkins Diet Recipe Generator**: see its section below. Its form is
   `9aed9f27-e0a3-4e73-b7ae-ac958b89f4f1`.
+- **Fitness Content Calendar Generator**: see its section below; it has no
+  default form yet, so set `HUBSPOT_FORM_ID_CONTENT_CALENDAR_GENERATOR` first.
 
 HubSpot rejects a whole submission if it names a field the form does not
 define, so the route reads the form's public definition, sends only the
@@ -241,6 +247,7 @@ GEMINI_MODEL     optional, defaults to gemini-3.5-flash-lite (fast, generous fre
                  gemini-3.8-flash is the higher-quality free alternative
 GEMINI_MODEL_INTAKE  optional, model for the Intake Form Generator only (defaults to GEMINI_MODEL)
 GEMINI_MODEL_ATKINS  optional, model for the Atkins Diet Recipe Generator only (defaults to GEMINI_MODEL)
+GEMINI_MODEL_CALENDAR  optional, model for the Fitness Content Calendar Generator only (defaults to GEMINI_MODEL)
 ```
 
 `GET /api/generate` reports `keySource`, the env var name it found (never
@@ -871,6 +878,176 @@ screens in one 536 px card, all within the 580 px embed height:
   claims, ketosis guarantees, copied recipes and Atkins branding; the tool
   asks for no medical history.
 
+## Fitness Content Calendar Generator
+
+B2B lead magnet in the shared shell at `/content-calendar-generator/`. Three
+screens in one 536 px card, all within the 580 px embed height:
+
+1. **Content strategy inputs**: `Your Fitness Business` (dropdown, eleven
+   types), `Your Fitness Niche` (multi-select, up to five), `Your Target
+   Audience` (up to four), `Target Platforms` (up to four of Instagram,
+   TikTok, Facebook, LinkedIn, YouTube, Pinterest, Threads, Twitter/X), `Your
+   Content Goals` (up to four) and `Calendar Duration` (7 / 14 / 30 days,
+   default 30). `Advanced Preferences` holds `Posts Per Week` (3, 4, 5 or
+   daily; default 5), `Brand Tone`, `Content Formats`, `Language` (English
+   plus seven others), `Main Offer / Service`, `Key Promotions`, `Calendar
+   Start Date` (defaults to today in the browser's local calendar; the hint
+   under it shows how many posts the chosen window holds) and `Additional
+   Instructions`. `Generate My Content Calendar` only moves to the gate;
+   Gemini is not called yet.
+2. **Lead gate**: `Your Content Calendar Is Almost Ready`, `Enter your
+   details to create and download your personalized calendar.`, `Full
+   Name`, `Email Address` (format + disposable domains) and the privacy
+   policy link (no marketing tick box, by the same decision as the other
+   tools). `Create My Calendar` sends the lead to HubSpot, then asks Gemini
+   while the button reads `Creating your content strategy...` and then
+   `Building your calendar...`, then opens the modal. Nothing is shown until
+   the answer is validated. Going back keeps every selection; closing the
+   modal leaves an `Open My Calendar` button, no second generation.
+3. **Results modal** (`Your Content Calendar Is Ready`): the summary
+   (`30-Day Content Calendar`, `17 Planned Posts · Instagram + Facebook`,
+   date range, frequency, primary goal, the model's strategy summary, the
+   pillar shares with planned counts), a notice if any planned post could
+   not be written, a `Calendar` / `List` toggle (a week-by-week grid with
+   pillar-coloured platform tags, or chronological cards with date,
+   platforms, format, pillar, topic and hook), the selected post in full
+   (hook, caption, visual direction, CTA, hashtags, production notes, the
+   second platform's version, status Draft) with `Copy Caption`, `Copy
+   Hashtags`, `Edit Post` (topic, hook, caption, CTA, visual direction,
+   publishing date; the weekday follows the date) and `Regenerate Post`,
+   then `PDF page size`, `Download PDF`, `Download CSV`, `Download .ics`,
+   `Regenerate Calendar`, `Change settings`, a review note, and the CTA
+   `Turn Your Content Into Paying Clients` with three value points and
+   `Start Your 30-Day Free Trial`
+   (`utm_source=fitness_content_calendar_generator&utm_medium=tool_cta&utm_campaign=lead_conversion`).
+
+- **The schedule is planned before the model writes a word**
+  (`dateScheduler.ts`, `contentStrategy.ts`). Dates are local calendar
+  dates (never UTC timestamps): 3 posts per week fall on Monday, Wednesday
+  and Friday, 4 on Monday, Tuesday, Thursday and Friday, 5 on weekdays,
+  daily on every day, inside the window that starts on the chosen date, so
+  7 days at 3 per week is 3 posts, 14 days at 5 per week is 10, and 30 days
+  at 4 per week is 17 or 18 depending on where the partial week falls. The
+  pillar balance starts at 40 / 25 / 20 / 15 (Educational, Engagement,
+  Authority, Promotional) and shifts for the selected goals (leads raise
+  authority and conversion, engagement raises interactive content, selling
+  programs raises promotion, retention and community raise engagement), is
+  turned into post counts by largest remainder, and spread evenly so the
+  calendar never opens with a promotion. Each slot gets a platform
+  (rotating through the selection, with the next platform as the version to
+  adapt for), a format (the user's chosen formats where they fit the
+  platform, else the platform's defaults) and a strategic angle (a common
+  mistake and the fix, a this-or-that question, how sessions are structured
+  for this audience, who the offer is for and not for, and so on), with the
+  rotation seeded by the business profile so different users do not get the
+  same first post shape.
+- **Generation is Gemini-only, in chunks** (`api/generate-calendar.ts`,
+  `aiCalendar.ts`). The route validates the request with Zod
+  (`schema.ts`), strips control and markup characters from the free text
+  and quotes it as data, and builds the prompt from the spec's strategist
+  instruction, the user information, the pillar shares and goal hints, the
+  business focus (a gym owner gets classes, community, trainers and
+  membership benefits; a yoga instructor gets mobility, practice
+  consistency and class experiences; a nutrition coach gets nutrition
+  education and habit building, never medical diets), the audience, the
+  rules for every platform in play (format, hook style, caption length,
+  hashtag count) and the planned slots. Slots are written ten at a time,
+  the chunks run concurrently, and each returned post is cleaned and judged:
+  lengths, Twitter/X under 280 characters, per-platform hashtag limits
+  (none on Threads), banned phrases (`unlock your potential`, `no
+  excuses`, …), invented client results, invented promotions when none were
+  given, leftover placeholders, repeated topics, a missing or copied
+  platform version. Only the slots that failed are asked for again, with
+  the reasons, in up to two repair rounds; a calendar with fewer than 70% of
+  its slots filled is refused (502 `invalid`, the gate shows `The generated
+  calendar didn't pass our quality checks. Please try again.` with `Try
+  Again`), and any slot still missing after the repairs is counted in
+  `unfilled` and shown in the modal, never hidden. Rate limits: 10 requests
+  per IP per 10 minutes and 3 in flight per instance (429), a 429 from Gemini
+  passed through, a 55 s budget inside the 60 s function limit.
+  `GEMINI_MODEL_CALENDAR` picks a model for this tool alone (default
+  `GEMINI_MODEL`, then `gemini-3.5-flash-lite`; the route never switches
+  models on its own). `mode: 'post'` rewrites one slot with the other
+  topics in the avoid list. `GET /api/generate-calendar` reports
+  `configured`, `model`, `keySource` and the limits. Nothing is stored
+  server-side; the user's name and email never reach Gemini.
+- **One calendar object feeds the grid, the list, the editor and every
+  export** (`calendarUtils.ts`, `exports.ts`, `generatePdf.ts`). The PDF
+  (jsPDF, compressed, `fitbudd-fitness-content-calendar.pdf`) has a cover
+  with the title, business, niche, audience, platforms, goals, posting
+  frequency, tone and language, the strategy summary, a pillar table with
+  target shares and planned counts, a week-by-week calendar overview with
+  pillar-coloured entries, then every post in full across as many pages as
+  it needs (hook, caption with its paragraphs, visual direction, CTA,
+  hashtags, production notes, the other platform's version), a closing
+  review note, a running header and `Page X of Y`. The CSV
+  (`fitbudd-fitness-content-calendar.csv`, UTF-8 with BOM, RFC 4180
+  quoting, line breaks kept inside quoted cells, formula-looking cells
+  prefixed with an apostrophe) has the columns Date, Day, Platform, Content
+  Pillar, Format, Topic, Hook, Caption, Creative Direction, CTA, Hashtags,
+  Production Notes, Status, one row per post-platform version. The .ics
+  (`fitbudd-fitness-content-calendar.ics`) is one all-day event per post
+  for Google Calendar, Outlook or Apple Calendar. Nothing is scheduled or
+  published for the user, and the copy says so.
+- **Tests**: `node scripts/calendar-export-check.mjs [out-dir] [calendar.json …]`
+  builds a 3-, 10- and 30-post fixture (two platforms with versions, long
+  captions, special characters, formula-looking cells) and any saved
+  calendars as PDF (Letter and A4), CSV and .ics, and checks each (valid
+  file, page numbers, the strategy and overview sections, every topic,
+  caption opening and ending and platform version present, no empty pages;
+  13 columns, one row per version, a parser round trip with captions intact,
+  formula cells neutralised; one event per post). `BASE=http://localhost:5173
+  node scripts/calendar-acceptance.mjs [out-dir] [start-date]` runs the
+  spec's scenarios against a configured route: a personal trainer (strength,
+  busy professionals, Instagram, leads, 14 days at 5 per week), a gym owner
+  (general fitness, gym beginners, Instagram + Facebook, memberships, 30
+  days at 4 per week) and a yoga instructor (yoga + mobility, beginners,
+  Instagram, awareness, 7 days at 3 per week), and checks the calendar
+  accuracy rules (post count for the duration and frequency, dates on the
+  posting weekdays with the right weekday names, no duplicate ids or dates,
+  every field present, platforms used and nothing else, hashtags only where
+  allowed, no banned phrases or invented promotions, business and audience
+  vocabulary, every pillar represented, varied hooks and CTAs, a strategy
+  summary) and the pairwise difference between the scenarios.
+- **HubSpot**: this tool needs its own form. Create one in HubSpot
+  (Marketing → Forms; the classic editor exposes the public definition the
+  route reads) with `email` and `firstname`, plus any of the fields below
+  as single-line text contact properties, and set
+  `HUBSPOT_FORM_ID_CONTENT_CALENDAR_GENERATOR` on Vercel (or paste the GUID
+  into `defaultFormId` in `api/track.ts`). Until then `GET /api/track`
+  shows a warning for the tool and its events are logged and skipped, never
+  sent to another tool's form. `tracking.ts` is the one place that maps
+  the tool's data to property names; none of the custom ones exist as
+  contact properties yet, except `internal_src` (the portal's "page or CTA
+  that sourced this lead") and the UTM properties, which the lead also
+  carries. Events: `lead` (on `Create My Calendar`, before Gemini):
+  `email`, `firstname`, `lastname`, `business_type`, `fitness_niche`,
+  `target_audience`, `social_platforms`, `content_goals`,
+  `calendar_duration`, `posting_frequency`, `brand_tone`, `main_offer`,
+  `lead_magnet_source` and `tool_source` and `internal_src`
+  (`fitness_content_calendar_generator`), `lead_magnet_type`
+  (`content_calendar`), `campaign` (`lead_magnet`), `cta_destination`,
+  `utm_source`, `utm_medium`, `utm_campaign`, `utm_content`, `page_url`,
+  `submitted_at`; then `generated` (`calendar_generated`,
+  `calendar_generated_at`, `calendar_duration`, `planned_posts`),
+  `regenerate` (`calendar_regenerated`, `calendar_regenerated_at`,
+  `planned_posts`), `pdf_download` (`pdf_downloaded`,
+  `pdf_downloaded_at`), `csv_download` (`csv_downloaded`,
+  `csv_downloaded_at`) and `cta_click` (`cta_clicked`, `cta_text`,
+  `cta_url`, `cta_clicked_at`), each with the email. The lead is sent once
+  per email + settings; editing, rewriting a post, regenerating and
+  downloading never resubmit it. Attribution from the Webflow page works
+  exactly as for the intake tool (`src/shared/lib/attribution.ts`, same
+  parent snippet).
+- **Content safety**: the prompt forbids invented testimonials, results,
+  client or trainer names, events and statistics, invented offers,
+  discounts and deadlines, trend claims, promises of virality, followers or
+  revenue, unsafe exercise advice, unrealistic body-change messaging and
+  medical claims; a testimonial-format post is a template that asks the
+  user for a real, permissioned story. The route rejects what slips
+  through, and the modal and PDF remind the user that every post is a
+  draft to review before publishing.
+
 ## Structure
 
 ```
@@ -886,6 +1063,7 @@ pricing-package-builder/index.html
 one-rep-max-calculator/index.html
 intake-form-generator/index.html
 atkins-recipe-generator/index.html
+content-calendar-generator/index.html
 api/
   track.ts                         shared HubSpot route: per-tool form + fields
   generate.ts                      shared Gemini route: hashtags, challenge, recipes
@@ -893,6 +1071,8 @@ api/
                                    attempt, per-IP and in-flight limits (no canned fallback)
   generate-recipes.ts              Atkins Diet Recipe Generator: Gemini + Zod, computed nutrition,
                                    plan-rule checks, up to three calls (no canned fallback)
+  generate-calendar.ts             Fitness Content Calendar Generator: planned schedule + Gemini in
+                                   concurrent chunks, per-post validation, repair rounds (no fallback)
 src/
   shared/
     index.css                      Tailwind theme (FitBudd colours) + iframe rules
@@ -945,6 +1125,14 @@ src/
                                    shared with the route), atkinsRules (plan / phase profiles,
                                    restriction and protein rules, checks), nutrition (reference
                                    data + calculator), recipeUtils, generatePdf, tracking, types
+  tools/content-calendar-generator/
+                                   ContentCalendarGenerator (three screens), CalendarInputForm,
+                                   EmailCaptureGate, CalendarResultsModal, CalendarGrid, CalendarList,
+                                   ContentPostCard, ContentPostEditor, aiCalendar (route client),
+                                   schema (Zod, shared with the route), dateScheduler (local dates,
+                                   posting weekdays, grid weeks), contentStrategy (pillar balance,
+                                   angles, platform formats and rules, slot planning), calendarUtils,
+                                   exports (CSV + .ics), generatePdf, tracking, types
 scripts/
   intake-pdf-check.mjs             builds fixture PDFs (10 / 20 / 28 questions, edge cases) and checks them
   intake-acceptance.mjs            four-persona acceptance test against a configured route
@@ -953,8 +1141,11 @@ scripts/
   atkins-pdf-check.mjs             builds collection + single-recipe PDFs from fixtures and checks them
   atkins-acceptance.mjs            the spec's four scenarios against a configured route
   fixtures/atkins-samples.mjs      the Atkins PDF fixtures (test data only, never shipped)
+  calendar-export-check.mjs        builds PDF / CSV / .ics from fixtures and saved calendars and checks them
+  calendar-acceptance.mjs          the spec's three scenarios + calendar accuracy checks against a route
+  fixtures/calendar-samples.mjs    the calendar export fixtures (test data only, never shipped)
 vite.config.ts                     multi-page build + dev middleware serving api/*.ts
-vercel.json                        30 s maxDuration for api/generate.ts, 45 s for the intake and recipes routes
+vercel.json                        30 s maxDuration for api/generate.ts, 45 s for the intake and recipes routes, 60 s for the calendar route
 .env.example                       every env var, documented
 ```
 

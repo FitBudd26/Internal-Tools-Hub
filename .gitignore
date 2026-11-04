@@ -12,3 +12,5 @@ dist
 .vercel
 .acceptance-atkins/
 .pdf-check-atkins/
+.acceptance-calendar/
+.export-check-calendar/

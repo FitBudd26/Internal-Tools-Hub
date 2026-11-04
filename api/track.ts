@@ -346,6 +346,65 @@ const TOOLS: Record<string, ToolConfig> = {
       },
     },
   },
+  'content-calendar-generator': {
+    pageName: 'Fitness Content Calendar Generator',
+    formIdEnv: 'HUBSPOT_FORM_ID_CONTENT_CALENDAR_GENERATOR',
+    // No form yet: create one in HubSpot (README, "Fitness Content Calendar Generator") and set
+    // HUBSPOT_FORM_ID_CONTENT_CALENDAR_GENERATOR on Vercel, or paste its GUID here. Until then this
+    // tool's submissions are logged and skipped, never sent to another tool's form.
+    defaultFormId: '',
+    events: {
+      lead: {
+        primary: true,
+        fields: [
+          'email',
+          'firstname',
+          'lastname',
+          'business_type',
+          'fitness_niche',
+          'target_audience',
+          'social_platforms',
+          'content_goals',
+          'calendar_duration',
+          'posting_frequency',
+          'brand_tone',
+          'main_offer',
+          'lead_magnet_source',
+          'lead_magnet_type',
+          'tool_source',
+          'internal_src',
+          'campaign',
+          'cta_destination',
+          'utm_source',
+          'utm_medium',
+          'utm_campaign',
+          'utm_content',
+          'page_url',
+          'submitted_at',
+        ],
+      },
+      generated: {
+        primary: false,
+        fields: ['email', 'calendar_generated', 'calendar_generated_at', 'calendar_duration', 'planned_posts', 'tool_source', 'page_url'],
+      },
+      regenerate: {
+        primary: false,
+        fields: ['email', 'calendar_regenerated', 'calendar_regenerated_at', 'planned_posts', 'tool_source', 'page_url'],
+      },
+      pdf_download: {
+        primary: false,
+        fields: ['email', 'pdf_downloaded', 'pdf_downloaded_at', 'tool_source', 'page_url'],
+      },
+      csv_download: {
+        primary: false,
+        fields: ['email', 'csv_downloaded', 'csv_downloaded_at', 'tool_source', 'page_url'],
+      },
+      cta_click: {
+        primary: false,
+        fields: ['email', 'cta_clicked', 'cta_text', 'cta_url', 'cta_clicked_at', 'tool_source', 'page_url'],
+      },
+    },
+  },
 };
 
 function toolFields(cfg: ToolConfig): string[] {

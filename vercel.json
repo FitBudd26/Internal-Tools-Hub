@@ -2,6 +2,7 @@
   "functions": {
     "api/generate.ts": { "maxDuration": 30 },
     "api/generate-intake.ts": { "maxDuration": 45 },
-    "api/generate-recipes.ts": { "maxDuration": 45 }
+    "api/generate-recipes.ts": { "maxDuration": 45 },
+    "api/generate-calendar.ts": { "maxDuration": 60 }
   }
 }

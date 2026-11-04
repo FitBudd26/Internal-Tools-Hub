@@ -95,6 +95,7 @@ export default defineConfig({
         'one-rep-max-calculator': 'one-rep-max-calculator/index.html',
         'intake-form-generator': 'intake-form-generator/index.html',
         'atkins-recipe-generator': 'atkins-recipe-generator/index.html',
+        'content-calendar-generator': 'content-calendar-generator/index.html',
       },
     },
   },

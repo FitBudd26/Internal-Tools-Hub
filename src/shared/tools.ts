@@ -87,6 +87,13 @@ export const TOOLS: ToolMeta[] = [
       'Three original low-carb recipes from Gemini for the selected Atkins plan and phase (Atkins 20 phases 1-4, Atkins 40, or a flexible net-carb target), meal type, proteins, cuisine, cooking time and restrictions; nutrition computed from the ingredient quantities, every recipe checked against the plan rules, copy / PDF (single or all three) in US Letter or A4. Lead gate (name + email) before generation.',
     fallbackHeight: 580,
   },
+  {
+    slug: 'content-calendar-generator',
+    name: 'Fitness Content Calendar Generator',
+    description:
+      'A 7-, 14- or 30-day social media content calendar for a fitness business: the tool plans the schedule (dates, pillar balance, platforms, formats), Gemini writes every post (topic, hook, caption, creative direction, CTA, hashtags, platform versions), shown as a calendar grid or list with editing, per-post rewrite, PDF, CSV and .ics exports. Lead gate (name + email) before generation.',
+    fallbackHeight: 580,
+  },
 ];
 
 /** Webflow embed snippet (iframe-resizer v4, same pattern as the other FitBudd tools). */
