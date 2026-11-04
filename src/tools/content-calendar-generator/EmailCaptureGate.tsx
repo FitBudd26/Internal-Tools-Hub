@@ -124,7 +124,7 @@ export function EmailCaptureGate({ lead, onChange, summary, pending, stage, erro
           <button type="button" onClick={onBack} disabled={pending} className="rounded text-left hover:text-gray-700 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fb-orange disabled:cursor-not-allowed disabled:hover:no-underline">
             ← Back to content settings
           </button>
-          <span className="truncate text-right">{pending ? 'Usually 15 to 45 seconds' : 'No credit card required'}</span>
+          <span className="truncate text-right">{pending ? 'Usually 20 to 60 seconds' : 'No credit card required'}</span>
         </div>
       </div>
     </form>

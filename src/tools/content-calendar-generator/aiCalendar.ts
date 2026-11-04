@@ -24,7 +24,7 @@ export const FAILURE_MESSAGES: Record<CalendarFailure, string> = {
     : 'Calendar generation is temporarily unavailable. Please try again later.',
 };
 
-const REQUEST_TIMEOUT_MS = 70_000;
+const REQUEST_TIMEOUT_MS = 125_000;
 
 export function isConfigComplete(c: CalendarConfig): boolean {
   return Boolean(c.businessType && c.niches.length && c.audiences.length && c.platforms.length && c.goals.length && c.duration && c.frequency && (!c.startDate || isValidISODate(c.startDate)));

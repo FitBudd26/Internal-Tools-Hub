@@ -54,7 +54,7 @@ Import the repo as one Vercel project, framework Vite, root directory `/`.
 `api/` becomes the five serverless routes automatically; `vercel.json` raises
 `api/generate.ts` to a 30 s, `api/generate-intake.ts` and
 `api/generate-recipes.ts` to a 45 s and `api/generate-calendar.ts` to a
-60 s max duration. Env vars: `GEMINI_API_KEY` (AI generation; optional for
+120 s max duration. Env vars: `GEMINI_API_KEY` (AI generation; optional for
 every tool except the Intake Form, Atkins Recipe and Content Calendar
 generators, which have no fallback), plus the optional HubSpot overrides
 below. Free (Hobby)
@@ -951,7 +951,7 @@ screens in one 536 px card, all within the 580 px embed height:
   consistency and class experiences; a nutrition coach gets nutrition
   education and habit building, never medical diets), the audience, the
   rules for every platform in play (format, hook style, caption length,
-  hashtag count) and the planned slots. Slots are written ten at a time,
+  hashtag count) and the planned slots. Slots are written six at a time,
   the chunks run concurrently, and each returned post is cleaned and judged:
   lengths, Twitter/X under 280 characters, per-platform hashtag limits
   (none on Threads), banned phrases (`unlock your potential`, `no
@@ -964,7 +964,9 @@ screens in one 536 px card, all within the 580 px embed height:
   Again`), and any slot still missing after the repairs is counted in
   `unfilled` and shown in the modal, never hidden. Rate limits: 10 requests
   per IP per 10 minutes and 3 in flight per instance (429), a 429 from Gemini
-  passed through, a 55 s budget inside the 60 s function limit.
+  passed through, a 110 s budget inside the 120 s function limit (Gemini's
+  latency from Vercel varies between about 6 and 40 s per call, so a slow
+  call is allowed to finish rather than aborted).
   `GEMINI_MODEL_CALENDAR` picks a model for this tool alone (default
   `GEMINI_MODEL`, then `gemini-3.5-flash-lite`; the route never switches
   models on its own). `mode: 'post'` rewrites one slot with the other
@@ -1072,7 +1074,7 @@ api/
   generate-recipes.ts              Atkins Diet Recipe Generator: Gemini + Zod, computed nutrition,
                                    plan-rule checks, up to three calls (no canned fallback)
   generate-calendar.ts             Fitness Content Calendar Generator: planned schedule + Gemini in
-                                   concurrent chunks, per-post validation, repair rounds (no fallback)
+                                   concurrent chunks of six, per-post validation, repair rounds (no fallback)
 src/
   shared/
     index.css                      Tailwind theme (FitBudd colours) + iframe rules
@@ -1145,7 +1147,7 @@ scripts/
   calendar-acceptance.mjs          the spec's three scenarios + calendar accuracy checks against a route
   fixtures/calendar-samples.mjs    the calendar export fixtures (test data only, never shipped)
 vite.config.ts                     multi-page build + dev middleware serving api/*.ts
-vercel.json                        30 s maxDuration for api/generate.ts, 45 s for the intake and recipes routes, 60 s for the calendar route
+vercel.json                        30 s maxDuration for api/generate.ts, 45 s for the intake and recipes routes, 120 s for the calendar route
 .env.example                       every env var, documented
 ```
 

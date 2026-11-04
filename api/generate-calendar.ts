@@ -22,9 +22,9 @@
  *            400 bad_request · 429 rate_limited · 503 not_configured
  *            502 upstream | invalid (too few posts passed after the repair pass)
  *
- * Token budgeting: a calendar is written in chunks of up to 10 posts, the
+ * Token budgeting: a calendar is written in chunks of up to 6 posts, the
  * chunks run concurrently, and only the slots that failed are asked for again
- * (at most two repair rounds), inside a 55 s budget under the 60 s limit.
+ * (at most two repair rounds), inside a 110 s budget under the 120 s limit.
  */
 
 import { generateCalendarRequestSchema, rawChunkSchema, type GenerateCalendarRequest, type RawPost } from '../src/tools/content-calendar-generator/schema.js';
@@ -35,11 +35,13 @@ import { BUSINESS_HINTS, GOAL_HINTS, PLATFORM_DEFAULT_FORMATS, PLATFORM_RULES, p
 declare const process: { env: Record<string, string | undefined> };
 
 const DEFAULT_MODEL = 'gemini-3.5-flash-lite';
-/** vercel.json gives this route 60 s; keep a margin for the response. */
-const TOTAL_BUDGET_MS = 55_000;
-const CALL_MS = 30_000;
+/** vercel.json gives this route 120 s; keep a margin for the response. */
+const TOTAL_BUDGET_MS = 110_000;
+/** Gemini's latency from Vercel varies a lot (6 s to 40 s for the same prompt), so a slow first call is allowed to finish rather than aborted and retried from scratch. */
+const FIRST_CALL_MS = 70_000;
 const MAX_OUTPUT_TOKENS = 8192;
-const CHUNK_SIZE = 10;
+/** Posts per model call: fewer output tokens per call keeps each call short; chunks run concurrently. */
+const CHUNK_SIZE = 6;
 const MAX_REPAIR_ROUNDS = 2;
 /** Below this share of filled slots the calendar is refused rather than shown incomplete. */
 const MIN_FILL_RATIO = 0.7;
@@ -479,11 +481,13 @@ export default async function handler(req: CalendarRequest, res: CalendarRespons
     const byId = new Map(group.map((s) => [s.id, s]));
     let answer: { status: number; ok: boolean; text: string };
     try {
-      answer = await ask(buildPrompt(ctx, group, avoidTopics, correction), Math.min(timeLeft(), CALL_MS));
+      // First round: most of the budget, leaving room for one repair; repairs: whatever is left.
+      const ms = correction ? timeLeft() : Math.min(timeLeft() - 15_000, FIRST_CALL_MS);
+      answer = await ask(buildPrompt(ctx, group, avoidTopics, correction), Math.max(ms, 5_000));
       if (answer.status === 400 && thinking) {
         console.error(`[calendar] gemini ${model} rejected thinkingConfig:`, answer.text.slice(0, 200));
         thinking = undefined;
-        answer = await ask(buildPrompt(ctx, group, avoidTopics, correction), Math.min(timeLeft(), CALL_MS));
+        answer = await ask(buildPrompt(ctx, group, avoidTopics, correction), timeLeft());
       }
     } catch (err) {
       console.error(`[calendar] gemini ${model} call failed:`, err instanceof Error ? err.message : err);
