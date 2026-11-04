@@ -118,7 +118,7 @@ HUBSPOT_FORM_ID_AI_WORKOUT_GENERATOR          optional, per-tool form
 HUBSPOT_FORM_ID_PRICING_PACKAGE_BUILDER       optional, per-tool form
 HUBSPOT_FORM_ID_ONE_REP_MAX_CALCULATOR        optional, per-tool form
 HUBSPOT_FORM_ID_INTAKE_FORM_GENERATOR         optional, per-tool form
-HUBSPOT_FORM_ID_ATKINS_RECIPE_GENERATOR       required for that tool: it has no default form yet
+HUBSPOT_FORM_ID_ATKINS_RECIPE_GENERATOR       optional, per-tool form
 HUBSPOT_PRIVATE_APP_TOKEN                     optional, authenticated secure-submit endpoint
 VITE_TRACK_IN_DEV                             dev only, 'true' sends events from `npm run dev`
 ```
@@ -186,8 +186,8 @@ What each tool sends:
   form is `b2222d23-1400-4bec-a812-e818740c59f5`.
 - **Personal Trainer Intake Form Generator**: see its section below. Its
   form is `55a81db2-9d9b-4a2a-800f-d278463ea3fb`.
-- **Atkins Diet Recipe Generator**: see its section below; it has no
-  default form yet, so set `HUBSPOT_FORM_ID_ATKINS_RECIPE_GENERATOR` first.
+- **Atkins Diet Recipe Generator**: see its section below. Its form is
+  `9aed9f27-e0a3-4e73-b7ae-ac958b89f4f1`.
 
 HubSpot rejects a whole submission if it names a field the form does not
 define, so the route reads the form's public definition, sends only the
@@ -835,14 +835,15 @@ screens in one 536 px card, all within the 580 px embed height:
   recipes, quantities, instructions, time, nutrition status, the meal
   guide, proteins, cuisine and excluded foods, compares the scenarios
   pairwise, and saves the sets as JSON for the PDF check.
-- **HubSpot**: this tool needs its own form. Create one in HubSpot
-  (Marketing → Forms; the classic editor exposes the public definition the
-  route reads) with `email` and `firstname`, plus any of the fields below
-  as single-line text contact properties, and set
-  `HUBSPOT_FORM_ID_ATKINS_RECIPE_GENERATOR` on Vercel (or paste the GUID
-  into `defaultFormId` in `api/track.ts`). Until then `GET /api/track`
-  shows a warning for the tool and its events are logged and skipped, never
-  sent to another tool's form. None of the custom fields exist as contact
+- **HubSpot**: form `9aed9f27-e0a3-4e73-b7ae-ac958b89f4f1` (set
+  `HUBSPOT_FORM_ID_ATKINS_RECIPE_GENERATOR` to point the tool elsewhere). The
+  route reads the form's public definition and sends only the fields it
+  defines. Today that is `email` and `firstname`, so the lead carries just
+  those two and the secondary events below are skipped. Add any of the
+  fields below to the form as single-line text contact properties
+  (Marketing → Forms, classic editor) and the route starts sending them on
+  the next submission; `GET /api/track` lists what the form still lacks
+  under `missingFields`. None of the custom fields exist as contact
   properties yet, except `internal_src` (the portal's "page or CTA that
   sourced this lead") and the UTM properties, which the lead also carries.
   Events: `lead` (on `Get My Recipes`, before Gemini): `email`,

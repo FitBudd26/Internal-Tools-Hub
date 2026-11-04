@@ -297,10 +297,9 @@ const TOOLS: Record<string, ToolConfig> = {
   'atkins-recipe-generator': {
     pageName: 'Atkins Diet Recipe Generator',
     formIdEnv: 'HUBSPOT_FORM_ID_ATKINS_RECIPE_GENERATOR',
-    // No form yet: create one in HubSpot (README, "Atkins Diet Recipe Generator") and set
-    // HUBSPOT_FORM_ID_ATKINS_RECIPE_GENERATOR on Vercel, or paste its GUID here. Until then this
-    // tool's submissions are logged and skipped, never sent to another tool's form.
-    defaultFormId: '',
+    // The form currently defines email + firstname only; add the properties below to it (README,
+    // "Atkins Diet Recipe Generator") and the route starts sending them automatically.
+    defaultFormId: '9aed9f27-e0a3-4e73-b7ae-ac958b89f4f1',
     events: {
       lead: {
         primary: true,
