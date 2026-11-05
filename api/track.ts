@@ -349,10 +349,9 @@ const TOOLS: Record<string, ToolConfig> = {
   'content-calendar-generator': {
     pageName: 'Fitness Content Calendar Generator',
     formIdEnv: 'HUBSPOT_FORM_ID_CONTENT_CALENDAR_GENERATOR',
-    // No form yet: create one in HubSpot (README, "Fitness Content Calendar Generator") and set
-    // HUBSPOT_FORM_ID_CONTENT_CALENDAR_GENERATOR on Vercel, or paste its GUID here. Until then this
-    // tool's submissions are logged and skipped, never sent to another tool's form.
-    defaultFormId: '',
+    // The form currently defines email + firstname only; add the properties below to it (README,
+    // "Fitness Content Calendar Generator") and the route starts sending them automatically.
+    defaultFormId: '93cc04dc-fd53-4534-b41e-a39afb912c83',
     events: {
       lead: {
         primary: true,
